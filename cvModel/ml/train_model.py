@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import csv
 import json
 import pickle
@@ -35,8 +36,10 @@ def load_rows(path: Path = TRAINING_DATA_PATH) -> tuple[list[dict[str, str]], li
 def split_features_and_targets(
     rows: list[dict[str, str]],
     fieldnames: list[str],
+    excluded_features: set[str] | None = None,
 ) -> tuple[list[dict[str, object]], list[list[float]], list[str]]:
-    feature_columns = [name for name in fieldnames if name not in TARGET_FEATURES]
+    excluded = excluded_features or set()
+    feature_columns = [name for name in fieldnames if name not in TARGET_FEATURES and name not in excluded]
     feature_dicts: list[dict[str, object]] = []
     targets: list[list[float]] = []
 
@@ -54,7 +57,7 @@ def split_features_and_targets(
     return feature_dicts, targets, feature_columns
 
 
-def train_model() -> dict[str, object]:
+def train_model(excluded_features: set[str] | None = None) -> dict[str, object]:
     rows, fieldnames = load_rows()
     if not rows:
         raise ValueError("Training dataset is empty.")
@@ -63,7 +66,11 @@ def train_model() -> dict[str, object]:
     if missing_targets:
         raise ValueError(f"Training dataset is missing target columns: {missing_targets}")
 
-    feature_dicts, targets, raw_feature_columns = split_features_and_targets(rows, fieldnames)
+    feature_dicts, targets, raw_feature_columns = split_features_and_targets(
+        rows,
+        fieldnames,
+        excluded_features=excluded_features,
+    )
 
     vectorizer = DictVectorizer(sparse=False)
     x_matrix = vectorizer.fit_transform(feature_dicts)
@@ -81,6 +88,7 @@ def train_model() -> dict[str, object]:
         "raw_feature_columns": raw_feature_columns,
         "encoded_feature_columns": list(vectorizer.feature_names_),
         "target_columns": TARGET_FEATURES,
+        "excluded_features": sorted(excluded_features or set()),
     }
     return artifact
 
@@ -100,13 +108,18 @@ def update_feature_schema(artifact: dict[str, object], path: Path = FEATURE_SCHE
     schema["target_features"] = TARGET_FEATURES
     schema["training_input_columns"] = artifact["raw_feature_columns"]
     schema["encoded_feature_columns"] = artifact["encoded_feature_columns"]
+    schema["excluded_training_features"] = artifact.get("excluded_features", [])
     schema["model_artifact"] = str(MODEL_PATH.relative_to(ROOT_DIR))
 
     path.write_text(json.dumps(schema, indent=2) + "\n", encoding="utf-8")
 
 
 def main() -> None:
-    artifact = train_model()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--exclude-feature", action="append", default=[])
+    args = parser.parse_args()
+
+    artifact = train_model(excluded_features=set(args.exclude_feature))
     save_model_artifact(artifact)
     update_feature_schema(artifact)
     print(f"Saved trained model to {MODEL_PATH}")

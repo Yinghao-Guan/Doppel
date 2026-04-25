@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import csv
 import json
 import math
@@ -20,18 +21,18 @@ from train_model import CATEGORICAL_FEATURES, TARGET_FEATURES, load_rows, split_
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODELS_DIR = ROOT_DIR / "models"
 TRAINING_DATA_PATH = ROOT_DIR / "data" / "processed" / "training_data.csv"
-METRICS_PATH = MODELS_DIR / "evaluation_metrics.json"
-FEATURE_IMPORTANCE_CSV_PATH = MODELS_DIR / "feature_importance.csv"
-FEATURE_IMPORTANCE_PLOT_PATH = MODELS_DIR / "feature_importance.png"
-SANITY_CHECKS_PATH = MODELS_DIR / "sanity_checks.json"
 
 
-def evaluate_model() -> dict[str, object]:
+def evaluate_model(excluded_features: set[str] | None = None) -> dict[str, object]:
     rows, fieldnames = load_rows(TRAINING_DATA_PATH)
     if not rows:
         raise ValueError("Training dataset is empty.")
 
-    feature_dicts, targets, _ = split_features_and_targets(rows, fieldnames)
+    feature_dicts, targets, _ = split_features_and_targets(
+        rows,
+        fieldnames,
+        excluded_features=excluded_features,
+    )
 
     x_train_raw, x_test_raw, y_train, y_test = train_test_split(
         feature_dicts,
@@ -90,6 +91,7 @@ def evaluate_model() -> dict[str, object]:
             "test_rows": len(x_test_raw),
             "categorical_features": CATEGORICAL_FEATURES,
             "target_features": TARGET_FEATURES,
+            "excluded_features": sorted(excluded_features or set()),
         },
     }
 
@@ -242,14 +244,14 @@ def build_sanity_checks(model: RandomForestRegressor, vectorizer: DictVectorizer
     return results
 
 
-def save_feature_importance_csv(feature_importance: list[dict[str, object]], path: Path = FEATURE_IMPORTANCE_CSV_PATH) -> None:
+def save_feature_importance_csv(feature_importance: list[dict[str, object]], path: Path) -> None:
     with path.open("w", encoding="utf-8", newline="") as output_file:
         writer = csv.DictWriter(output_file, fieldnames=["feature", "importance"])
         writer.writeheader()
         writer.writerows(feature_importance)
 
 
-def save_feature_importance_plot(feature_importance: list[dict[str, object]], path: Path = FEATURE_IMPORTANCE_PLOT_PATH) -> None:
+def save_feature_importance_plot(feature_importance: list[dict[str, object]], path: Path) -> None:
     top_features = feature_importance[:15]
     labels = [item["feature"] for item in top_features]
     values = [item["importance"] for item in top_features]
@@ -269,25 +271,42 @@ def save_json(payload: object, path: Path) -> None:
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
+def build_output_paths(suffix: str) -> dict[str, Path]:
+    suffix_part = f"_{suffix}" if suffix else ""
+    return {
+        "metrics": MODELS_DIR / f"evaluation_metrics{suffix_part}.json",
+        "feature_importance_csv": MODELS_DIR / f"feature_importance{suffix_part}.csv",
+        "feature_importance_plot": MODELS_DIR / f"feature_importance{suffix_part}.png",
+        "sanity_checks": MODELS_DIR / f"sanity_checks{suffix_part}.json",
+    }
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--exclude-feature", action="append", default=[])
+    parser.add_argument("--output-suffix", default="")
+    args = parser.parse_args()
+
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    results = evaluate_model()
+    excluded_features = set(args.exclude_feature)
+    output_paths = build_output_paths(args.output_suffix)
+    results = evaluate_model(excluded_features=excluded_features)
     save_json(
         {
             "metrics": results["metrics"],
             "prediction_range": results["prediction_range"],
             "metadata": results["metadata"],
         },
-        METRICS_PATH,
+        output_paths["metrics"],
     )
-    save_feature_importance_csv(results["feature_importance"], FEATURE_IMPORTANCE_CSV_PATH)
-    save_feature_importance_plot(results["feature_importance"], FEATURE_IMPORTANCE_PLOT_PATH)
-    save_json(results["sanity_checks"], SANITY_CHECKS_PATH)
+    save_feature_importance_csv(results["feature_importance"], output_paths["feature_importance_csv"])
+    save_feature_importance_plot(results["feature_importance"], output_paths["feature_importance_plot"])
+    save_json(results["sanity_checks"], output_paths["sanity_checks"])
 
-    print(f"Saved evaluation metrics to {METRICS_PATH}")
-    print(f"Saved feature importance CSV to {FEATURE_IMPORTANCE_CSV_PATH}")
-    print(f"Saved feature importance plot to {FEATURE_IMPORTANCE_PLOT_PATH}")
-    print(f"Saved sanity checks to {SANITY_CHECKS_PATH}")
+    print(f"Saved evaluation metrics to {output_paths['metrics']}")
+    print(f"Saved feature importance CSV to {output_paths['feature_importance_csv']}")
+    print(f"Saved feature importance plot to {output_paths['feature_importance_plot']}")
+    print(f"Saved sanity checks to {output_paths['sanity_checks']}")
     print(json.dumps(results["metrics"], indent=2))
     print(json.dumps(results["prediction_range"], indent=2))
 
