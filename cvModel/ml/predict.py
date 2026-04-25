@@ -17,6 +17,39 @@ TARGET_COLUMNS = [
     "endurance_potential_score",
 ]
 
+DEFAULT_PROFILE = {
+    "Resting_BPM": 65,
+    "Avg_BPM": 140,
+    "Max_BPM": 190,
+    "Session_Duration": 1.0,
+    "Water_Intake": 2.5,
+    "Calories_Burned": 400,
+    "Fat_Percentage": 18,
+}
+
+FIELD_ALIASES = {
+    "age": "Age",
+    "gender": "Gender",
+    "height": "Height",
+    "height_m": "Height",
+    "height_cm": "Height",
+    "weight": "Weight",
+    "weight_kg": "Weight",
+    "workout_frequency": "Workout_Frequency",
+    "experience_level": "Experience_Level",
+    "workout_type": "Workout_Type",
+    "reps": "rep_count",
+    "form_score": "avg_form_score",
+    "depth_score": "avg_depth_score",
+    "tempo": "tempo_consistency",
+    "tempo_consistency": "tempo_consistency",
+    "stability": "stability_score",
+    "fatigue": "fatigue_slope",
+    "fatigue_trend": "fatigue_slope",
+    "knee_risk": "knee_valgus_risk",
+    "knee_valgus": "knee_valgus_risk",
+}
+
 DEMO_CASES = {
     "beginner_bad_form": {
         "Age": 31,
@@ -99,6 +132,22 @@ DEMO_CASES = {
         "knee_valgus_risk": 0.10,
         "back_angle_risk": 0.11,
     },
+    "minimal_frontend_input": {
+        "age": 22,
+        "gender": "Male",
+        "height_cm": 175,
+        "weight_kg": 72,
+        "workout_frequency": 4,
+        "experience_level": "Intermediate",
+        "workout_type": "Strength",
+        "reps": 10,
+        "form_score": 0.84,
+        "depth_score": 0.80,
+        "tempo_consistency": 0.78,
+        "stability": 0.82,
+        "fatigue_trend": 0.18,
+        "knee_risk": 0.12,
+    },
 }
 
 
@@ -156,18 +205,70 @@ def normalize_experience_level(value: object) -> str:
     return "Beginner"
 
 
+def coerce_number(value: object, default: float = 0.0) -> float:
+    if value in ("", None):
+        return default
+    return float(value)
+
+
+def apply_aliases(user_input: dict[str, object]) -> dict[str, object]:
+    adapted: dict[str, object] = {}
+    for key, value in user_input.items():
+        target_key = FIELD_ALIASES.get(key, key)
+        adapted[target_key] = value
+    return adapted
+
+
+def normalize_height(processed: dict[str, object], original_input: dict[str, object]) -> None:
+    if "height_cm" in original_input and original_input["height_cm"] not in ("", None):
+        processed["Height"] = coerce_number(original_input["height_cm"]) / 100.0
+        return
+
+    if "Height" not in processed or processed["Height"] in ("", None):
+        return
+
+    height_value = coerce_number(processed["Height"])
+    if height_value > 3.0:
+        height_value = height_value / 100.0
+    processed["Height"] = height_value
+
+
+def apply_profile_defaults(processed: dict[str, object]) -> None:
+    for key, value in DEFAULT_PROFILE.items():
+        if key not in processed or processed[key] in ("", None):
+            processed[key] = value
+
+
+def apply_cv_defaults(processed: dict[str, object]) -> None:
+    if "left_right_asymmetry" not in processed or processed["left_right_asymmetry"] in ("", None):
+        processed["left_right_asymmetry"] = 0.1
+
+    if "range_of_motion" not in processed or processed["range_of_motion"] in ("", None):
+        processed["range_of_motion"] = processed.get("avg_depth_score", 0.0)
+
+    if "back_angle_risk" not in processed or processed["back_angle_risk"] in ("", None):
+        processed["back_angle_risk"] = 1.0 - coerce_number(processed.get("avg_form_score", 0.0))
+
+
 def preprocess_input(user_input: dict[str, object]) -> dict[str, object]:
     schema = load_feature_schema()
     training_columns = list(schema["training_input_columns"])
     categorical_features = set(schema["categorical_features"])
 
-    processed = dict(user_input)
+    processed = apply_aliases(user_input)
+    normalize_height(processed, user_input)
+    apply_profile_defaults(processed)
+    apply_cv_defaults(processed)
+
     processed["Gender"] = normalize_gender(processed.get("Gender", ""))
     processed["Workout_Type"] = normalize_workout_type(processed.get("Workout_Type", ""))
     processed["Experience_Level"] = normalize_experience_level(processed.get("Experience_Level", "Beginner"))
 
     if "BMI" not in processed or processed["BMI"] in ("", None):
-        processed["BMI"] = compute_bmi(float(processed.get("Weight", 0.0)), float(processed.get("Height", 0.0)))
+        processed["BMI"] = compute_bmi(
+            coerce_number(processed.get("Weight", 0.0)),
+            coerce_number(processed.get("Height", 0.0)),
+        )
 
     if "movement_quality_score" not in processed or processed["movement_quality_score"] in ("", None):
         processed["movement_quality_score"] = compute_movement_quality_score(processed)
@@ -177,7 +278,7 @@ def preprocess_input(user_input: dict[str, object]) -> dict[str, object]:
         if column in categorical_features:
             normalized[column] = processed.get(column, "")
         else:
-            normalized[column] = float(processed.get(column, 0.0))
+            normalized[column] = coerce_number(processed.get(column, 0.0))
 
     return normalized
 
@@ -265,14 +366,29 @@ def generate_summary(scores: dict[str, float]) -> str:
     return "Scores are moderate overall. A controlled training session with attention to form is appropriate."
 
 
+def build_supporting_signals(input_data: dict[str, object]) -> dict[str, float]:
+    return {
+        "form_quality": round(clamp(float(input_data["avg_form_score"])) * 100.0, 1),
+        "depth_score": round(clamp(float(input_data["avg_depth_score"])) * 100.0, 1),
+        "tempo_consistency": round(clamp(float(input_data["tempo_consistency"])) * 100.0, 1),
+        "stability": round(clamp(float(input_data["stability_score"])) * 100.0, 1),
+        "fatigue_trend": round(clamp(float(input_data["fatigue_slope"])) * 100.0, 1),
+        "asymmetry": round(clamp(float(input_data["left_right_asymmetry"])) * 100.0, 1),
+        "range_of_motion": round(clamp(float(input_data["range_of_motion"])) * 100.0, 1),
+        "movement_quality": round(clamp(float(input_data["movement_quality_score"])) * 100.0, 1),
+    }
+
+
 def predict_athlete_outcome(user_input: dict[str, object]) -> dict[str, object]:
     processed_input = preprocess_input(user_input)
     scores = run_model(processed_input)
     explanations = generate_explanations(processed_input, scores)
     recommendations = generate_recommendations(processed_input, scores)
+    signals = build_supporting_signals(processed_input)
 
     return {
         "scores": scores,
+        "signals": signals,
         "summary": generate_summary(scores),
         "explanations": explanations,
         "recommendations": recommendations,
@@ -305,7 +421,11 @@ def print_cli_output(case_name: str, result: dict[str, object]) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("demo_case", nargs="?", help="One of: beginner_bad_form, intermediate_balanced, advanced_good_form")
+    parser.add_argument(
+        "demo_case",
+        nargs="?",
+        help="One of: beginner_bad_form, intermediate_balanced, advanced_good_form, minimal_frontend_input",
+    )
     parser.add_argument("--json", action="store_true", help="Print JSON output instead of human-readable output.")
     return parser.parse_args()
 
