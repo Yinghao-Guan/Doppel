@@ -4,6 +4,28 @@ import { Fragment, useEffect, useRef } from "react";
 import Link from "next/link";
 import gsap from "gsap";
 import { ArrowRight, Play } from "lucide-react";
+import LogoLoop from "./LogoLoop";
+
+const BUILT_WITH_LOGOS = [
+  {
+    src: "/logos/broncohackslogo.svg",
+    alt: "BroncoHacks",
+    title: "BroncoHacks",
+    href: "https://broncohacks.com",
+  },
+  {
+    src: "/logos/nextjslogo.svg",
+    alt: "Next.js",
+    title: "Next.js",
+    href: "https://nextjs.org",
+  },
+  {
+    src: "/logos/fastapilogo.svg",
+    alt: "FastAPI",
+    title: "FastAPI",
+    href: "https://fastapi.tiangolo.com",
+  },
+];
 
 const WORDMARK = ["d", "o", "p", "p", "e", "l"];
 
@@ -122,6 +144,29 @@ export function HeroOverlay() {
           <Play size={14} strokeWidth={2.2} />
           See the demo
         </Link>
+      </div>
+
+      <div
+        className="reveal-cta reveal mt-14 w-full max-w-md"
+        aria-label="Built at BroncoHacks with Next.js and FastAPI"
+      >
+        <p
+          className="mb-3 text-center text-[11px] uppercase tracking-[0.22em] text-[var(--fg)]/55"
+          style={{ textShadow: "0 2px 12px rgba(0,0,0,0.85)" }}
+        >
+          Built at BroncoHacks
+        </p>
+        <LogoLoop
+          logos={BUILT_WITH_LOGOS}
+          speed={50}
+          gap={40}
+          logoHeight={36}
+          pauseOnHover
+          scaleOnHover
+          fadeOut
+          fadeOutColor="#09090b"
+          ariaLabel="Built with"
+        />
       </div>
     </div>
   );
