@@ -12,7 +12,13 @@ const NAV_ITEMS: { label: string; href: string }[] = [
   { label: "SIMULATE", href: "/simulate" },
 ];
 
-export function TopNav({ hideBrand = false }: { hideBrand?: boolean }) {
+export function TopNav({
+  hideBrand = false,
+  hideNav = false,
+}: {
+  hideBrand?: boolean;
+  hideNav?: boolean;
+}) {
   const pathname = usePathname();
 
   return (
@@ -27,17 +33,7 @@ export function TopNav({ hideBrand = false }: { hideBrand?: boolean }) {
         <AccentSelector />
         {!hideBrand && (
           <Link href="/" className="group inline-flex items-baseline">
-            <span
-              className="font-display text-2xl font-medium tracking-[-0.04em] transition-opacity group-hover:opacity-80"
-              style={{
-                backgroundImage:
-                  "linear-gradient(135deg,var(--accent-cyan) 0%,#ffffff 50%,var(--accent) 75%,var(--accent-deep) 100%)",
-                WebkitBackgroundClip: "text",
-                backgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                color: "transparent",
-              }}
-            >
+            <span className="brand-shimmer font-display text-2xl font-medium tracking-[-0.04em] transition-opacity group-hover:opacity-80">
               doppel
             </span>
           </Link>
@@ -45,7 +41,7 @@ export function TopNav({ hideBrand = false }: { hideBrand?: boolean }) {
       </div>
 
       <nav className="hidden items-center gap-8 md:flex">
-        {NAV_ITEMS.map((item) => {
+        {!hideNav && NAV_ITEMS.map((item) => {
           const active =
             pathname === item.href ||
             (item.href !== "/" && pathname?.startsWith(item.href));
