@@ -9,6 +9,7 @@ const NAV_ITEMS: { label: string; href: string }[] = [
   { label: "CAPTURE", href: "/capture" },
   { label: "DASHBOARD", href: "/dashboard" },
   { label: "SIMULATE", href: "/simulate" },
+  { label: "WHAT-IF", href: "/what-if" },
 ];
 
 export function TopNav({ hideBrand = false }: { hideBrand?: boolean }) {
