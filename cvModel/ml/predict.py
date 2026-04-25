@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import pickle
 from pathlib import Path
@@ -7,6 +8,102 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 MODEL_PATH = ROOT_DIR / "models" / "athlete_model.pkl"
+FEATURE_SCHEMA_PATH = ROOT_DIR / "models" / "feature_columns.json"
+
+TARGET_COLUMNS = [
+    "readiness_score",
+    "injury_risk_score",
+    "strength_potential_score",
+    "endurance_potential_score",
+]
+
+DEMO_CASES = {
+    "beginner_bad_form": {
+        "Age": 31,
+        "Gender": "Male",
+        "Weight": 86,
+        "Height": 1.76,
+        "Max_BPM": 182,
+        "Avg_BPM": 165,
+        "Resting_BPM": 76,
+        "Session_Duration": 1.4,
+        "Calories_Burned": 720,
+        "Workout_Type": "Strength",
+        "Fat_Percentage": 27,
+        "Water_Intake": 1.7,
+        "Workout_Frequency": 2,
+        "Experience_Level": "Beginner",
+        "BMI": 27.8,
+        "rep_count": 9,
+        "avg_depth_score": 0.46,
+        "avg_form_score": 0.51,
+        "tempo_consistency": 0.49,
+        "stability_score": 0.52,
+        "left_right_asymmetry": 0.37,
+        "fatigue_slope": 0.58,
+        "range_of_motion": 0.50,
+        "knee_valgus_risk": 0.46,
+        "back_angle_risk": 0.42,
+    },
+    "intermediate_balanced": {
+        "Age": 24,
+        "Gender": "Female",
+        "Weight": 64,
+        "Height": 1.68,
+        "Max_BPM": 188,
+        "Avg_BPM": 150,
+        "Resting_BPM": 61,
+        "Session_Duration": 1.1,
+        "Calories_Burned": 520,
+        "Workout_Type": "Hiit",
+        "Fat_Percentage": 22,
+        "Water_Intake": 2.6,
+        "Workout_Frequency": 4,
+        "Experience_Level": "Intermediate",
+        "BMI": 22.7,
+        "rep_count": 14,
+        "avg_depth_score": 0.76,
+        "avg_form_score": 0.79,
+        "tempo_consistency": 0.75,
+        "stability_score": 0.77,
+        "left_right_asymmetry": 0.16,
+        "fatigue_slope": 0.24,
+        "range_of_motion": 0.78,
+        "knee_valgus_risk": 0.18,
+        "back_angle_risk": 0.19,
+    },
+    "advanced_good_form": {
+        "Age": 27,
+        "Gender": "Male",
+        "Weight": 74,
+        "Height": 1.8,
+        "Max_BPM": 186,
+        "Avg_BPM": 148,
+        "Resting_BPM": 56,
+        "Session_Duration": 1.2,
+        "Calories_Burned": 610,
+        "Workout_Type": "Strength",
+        "Fat_Percentage": 15,
+        "Water_Intake": 3.1,
+        "Workout_Frequency": 5,
+        "Experience_Level": "Advanced",
+        "BMI": 22.8,
+        "rep_count": 18,
+        "avg_depth_score": 0.89,
+        "avg_form_score": 0.92,
+        "tempo_consistency": 0.87,
+        "stability_score": 0.90,
+        "left_right_asymmetry": 0.08,
+        "fatigue_slope": 0.11,
+        "range_of_motion": 0.91,
+        "knee_valgus_risk": 0.10,
+        "back_angle_risk": 0.11,
+    },
+}
+
+
+def clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
+    return max(lower, min(upper, value))
 
 
 def load_artifact(path: Path = MODEL_PATH) -> dict[str, object]:
@@ -14,47 +111,217 @@ def load_artifact(path: Path = MODEL_PATH) -> dict[str, object]:
         return pickle.load(model_file)
 
 
-def predict(sample: dict[str, object]) -> dict[str, float]:
+def load_feature_schema(path: Path = FEATURE_SCHEMA_PATH) -> dict[str, object]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def compute_bmi(weight: float, height: float) -> float:
+    if height <= 0:
+        return 0.0
+    return weight / (height * height)
+
+
+def compute_movement_quality_score(input_data: dict[str, object]) -> float:
+    return clamp(
+        0.28 * float(input_data["avg_form_score"])
+        + 0.20 * float(input_data["avg_depth_score"])
+        + 0.18 * float(input_data["tempo_consistency"])
+        + 0.18 * float(input_data["stability_score"])
+        + 0.12 * float(input_data["range_of_motion"])
+        - 0.06 * float(input_data["left_right_asymmetry"])
+        - 0.05 * float(input_data["fatigue_slope"])
+    )
+
+
+def normalize_gender(value: object) -> str:
+    normalized = str(value).strip().title()
+    if normalized in {"Male", "Female"}:
+        return normalized
+    return ""
+
+
+def normalize_workout_type(value: object) -> str:
+    normalized = str(value).strip().title()
+    if normalized in {"Strength", "Cardio", "Hiit", "Yoga"}:
+        return normalized
+    return normalized
+
+
+def normalize_experience_level(value: object) -> str:
+    normalized = str(value).strip().title()
+    if normalized in {"Beginner", "Intermediate", "Advanced"}:
+        return normalized
+    if normalized.isdigit():
+        return {"1": "Beginner", "2": "Intermediate", "3": "Advanced"}.get(normalized, "Beginner")
+    return "Beginner"
+
+
+def preprocess_input(user_input: dict[str, object]) -> dict[str, object]:
+    schema = load_feature_schema()
+    training_columns = list(schema["training_input_columns"])
+    categorical_features = set(schema["categorical_features"])
+
+    processed = dict(user_input)
+    processed["Gender"] = normalize_gender(processed.get("Gender", ""))
+    processed["Workout_Type"] = normalize_workout_type(processed.get("Workout_Type", ""))
+    processed["Experience_Level"] = normalize_experience_level(processed.get("Experience_Level", "Beginner"))
+
+    if "BMI" not in processed or processed["BMI"] in ("", None):
+        processed["BMI"] = compute_bmi(float(processed.get("Weight", 0.0)), float(processed.get("Height", 0.0)))
+
+    if "movement_quality_score" not in processed or processed["movement_quality_score"] in ("", None):
+        processed["movement_quality_score"] = compute_movement_quality_score(processed)
+
+    normalized: dict[str, object] = {}
+    for column in training_columns:
+        if column in categorical_features:
+            normalized[column] = processed.get(column, "")
+        else:
+            normalized[column] = float(processed.get(column, 0.0))
+
+    return normalized
+
+
+def run_model(processed_input: dict[str, object]) -> dict[str, float]:
     artifact = load_artifact()
     vectorizer = artifact["vectorizer"]
     model = artifact["model"]
     target_columns = artifact["target_columns"]
 
-    x_matrix = vectorizer.transform([sample])
+    x_matrix = vectorizer.transform([processed_input])
     prediction = model.predict(x_matrix)[0]
-    return {target: round(float(value), 4) for target, value in zip(target_columns, prediction)}
+
+    return {
+        target: round(clamp(float(value)) * 100.0, 1)
+        for target, value in zip(target_columns, prediction)
+    }
+
+
+def generate_explanations(input_data: dict[str, object], scores: dict[str, float]) -> list[str]:
+    explanations: list[str] = []
+
+    if float(input_data["fatigue_slope"]) > 0.45:
+        explanations.append("Fatigue built up across the set, lowering readiness and increasing risk.")
+    if float(input_data["avg_form_score"]) < 0.65:
+        explanations.append("Form quality was below target, reducing strength potential and increasing risk.")
+    if float(input_data["knee_valgus_risk"]) > 0.35:
+        explanations.append("Knee valgus risk was elevated, which pushed injury risk higher.")
+    if float(input_data["stability_score"]) < 0.65:
+        explanations.append("Stability was inconsistent, suggesting control issues during the movement.")
+    if float(input_data["tempo_consistency"]) > 0.75:
+        explanations.append("Tempo consistency was strong, which supported readiness and endurance.")
+    if float(input_data["movement_quality_score"]) > 0.75:
+        explanations.append("Overall movement quality was strong, lifting readiness and strength potential.")
+    if scores["injury_risk_score"] < 25 and float(input_data["left_right_asymmetry"]) < 0.18:
+        explanations.append("Symmetry stayed controlled, helping keep injury risk low.")
+
+    if not explanations:
+        explanations.append("Movement signals were mixed, resulting in moderate predicted scores.")
+
+    return explanations[:4]
+
+
+def generate_recommendations(input_data: dict[str, object], scores: dict[str, float]) -> list[str]:
+    recommendations: list[str] = []
+
+    if scores["injury_risk_score"] > 40:
+        recommendations.append("Reduce intensity and focus on controlled form work before increasing load.")
+    if scores["readiness_score"] < 50:
+        recommendations.append("Prioritize recovery, hydration, and lighter training today.")
+    if float(input_data["avg_form_score"]) < 0.7:
+        recommendations.append("Practice slow bodyweight reps to improve squat mechanics.")
+    if float(input_data["fatigue_slope"]) > 0.4:
+        recommendations.append("Add longer rest intervals between sets to limit fatigue accumulation.")
+    if float(input_data["knee_valgus_risk"]) > 0.3:
+        recommendations.append("Focus on knee tracking and glute activation drills.")
+    if scores["strength_potential_score"] > 70:
+        recommendations.append("You are ready for progressive overload in the next strength session.")
+    if scores["endurance_potential_score"] > 65:
+        recommendations.append("A steady conditioning block would fit well today.")
+
+    if not recommendations:
+        recommendations.append("Keep the session moderate and monitor form quality across reps.")
+
+    return recommendations[:4]
+
+
+def generate_summary(scores: dict[str, float]) -> str:
+    readiness = scores["readiness_score"]
+    risk = scores["injury_risk_score"]
+    strength = scores["strength_potential_score"]
+    endurance = scores["endurance_potential_score"]
+
+    if readiness >= 70 and risk <= 25:
+        if strength >= endurance:
+            return "Movement quality looks strong and injury risk is low. You are ready for a strength-focused session."
+        return "Readiness is high and risk is controlled. You are in a good position for conditioning work."
+
+    if risk >= 40:
+        return "Injury risk is elevated relative to readiness. Today should emphasize control, recovery, and lighter loading."
+
+    if readiness < 50:
+        return "Readiness is limited today. A lighter technical session is a better fit than pushing intensity."
+
+    return "Scores are moderate overall. A controlled training session with attention to form is appropriate."
+
+
+def predict_athlete_outcome(user_input: dict[str, object]) -> dict[str, object]:
+    processed_input = preprocess_input(user_input)
+    scores = run_model(processed_input)
+    explanations = generate_explanations(processed_input, scores)
+    recommendations = generate_recommendations(processed_input, scores)
+
+    return {
+        "scores": scores,
+        "summary": generate_summary(scores),
+        "explanations": explanations,
+        "recommendations": recommendations,
+    }
+
+
+def print_cli_output(case_name: str, result: dict[str, object]) -> None:
+    scores = result["scores"]
+    print("AthleteTwin Prediction")
+    print()
+    if case_name:
+        print(f"Case: {case_name}")
+        print()
+    print(f"Readiness: {scores['readiness_score']:.1f}%")
+    print(f"Injury Risk: {scores['injury_risk_score']:.1f}%")
+    print(f"Strength Potential: {scores['strength_potential_score']:.1f}%")
+    print(f"Endurance Potential: {scores['endurance_potential_score']:.1f}%")
+    print()
+    print("Summary:")
+    print(f"- {result['summary']}")
+    print()
+    print("Why:")
+    for explanation in result["explanations"]:
+        print(f"- {explanation}")
+    print()
+    print("Recommendations:")
+    for recommendation in result["recommendations"]:
+        print(f"- {recommendation}")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("demo_case", nargs="?", help="One of: beginner_bad_form, intermediate_balanced, advanced_good_form")
+    parser.add_argument("--json", action="store_true", help="Print JSON output instead of human-readable output.")
+    return parser.parse_args()
 
 
 def main() -> None:
-    sample = {
-        "Age": 28.0,
-        "Gender": "Male",
-        "Weight": 72.0,
-        "Height": 1.78,
-        "Max_BPM": 185.0,
-        "Avg_BPM": 154.0,
-        "Resting_BPM": 60.0,
-        "Session_Duration": 1.2,
-        "Calories_Burned": 950.0,
-        "Workout_Type": "Hiit",
-        "Fat_Percentage": 18.0,
-        "Water_Intake": 2.8,
-        "Workout_Frequency": 4.0,
-        "Experience_Level": "Intermediate",
-        "BMI": 22.7,
-        "rep_count": 20.0,
-        "avg_depth_score": 0.78,
-        "avg_form_score": 0.81,
-        "tempo_consistency": 0.79,
-        "stability_score": 0.76,
-        "left_right_asymmetry": 0.16,
-        "fatigue_slope": 0.24,
-        "range_of_motion": 0.80,
-        "knee_valgus_risk": 0.18,
-        "back_angle_risk": 0.20,
-        "movement_quality_score": 0.78,
-    }
-    print(json.dumps(predict(sample), indent=2))
+    args = parse_args()
+    case_name = args.demo_case or "intermediate_balanced"
+    if case_name not in DEMO_CASES:
+        raise SystemExit(f"Unknown demo case: {case_name}")
+
+    result = predict_athlete_outcome(DEMO_CASES[case_name])
+    if args.json:
+        print(json.dumps(result, indent=2))
+        return
+
+    print_cli_output(case_name, result)
 
 
 if __name__ == "__main__":
