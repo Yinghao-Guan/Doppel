@@ -157,7 +157,7 @@ body {
 .doppel-mark {
   font-family: var(--font-display), system-ui, sans-serif;
   font-weight: 500;
-  font-size: clamp(4rem, 14vw, 8.5rem);
+  font-size: clamp(5rem, 17vw, 10.5rem);
   line-height: 1.05;
   letter-spacing: -0.045em;
   display: inline-flex;
@@ -170,7 +170,7 @@ body {
 
 @media (min-width: 768px) {
   .doppel-mark {
-    font-size: clamp(3.5rem, 9vw, 7rem);
+    font-size: clamp(4.4rem, 11.25vw, 8.75rem);
   }
 }
 
@@ -286,4 +286,70 @@ body {
   background: var(--fg);
   border: 2px solid var(--accent);
   cursor: pointer;
+}
+
+/* === readiness page utilities === */
+.score-ring-track {
+  stroke: rgba(255, 255, 255, 0.06);
+}
+
+.score-ring-glow {
+  filter: drop-shadow(0 0 12px var(--ring-tone, var(--accent)))
+    drop-shadow(0 0 28px color-mix(in srgb, var(--ring-tone, var(--accent)) 40%, transparent));
+}
+
+.typewriter-caret {
+  display: inline-block;
+  width: 0.55ch;
+  margin-left: 0.08ch;
+  background: var(--accent);
+  animation: blink-caret 0.9s steps(2) infinite;
+  vertical-align: -0.12em;
+  height: 1em;
+  box-shadow: 0 0 8px var(--accent);
+}
+
+@keyframes blink-caret {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.input-base {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 0.7rem 0.9rem;
+  color: var(--fg);
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 1.05rem;
+  outline: none;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+.input-base:focus {
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.scan-sweep {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--accent-cyan) 22%, transparent) 50%,
+    transparent 100%
+  );
+  mix-blend-mode: screen;
+  filter: blur(6px);
 }

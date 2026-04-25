@@ -8,6 +8,7 @@ import { AccentSelector } from "@/components/AccentSelector";
 const NAV_ITEMS: { label: string; href: string }[] = [
   { label: "CAPTURE", href: "/capture" },
   { label: "DASHBOARD", href: "/dashboard" },
+  { label: "READOUT", href: "/readiness" },
   { label: "SIMULATE", href: "/simulate" },
 ];
 

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, Manrope, JetBrains_Mono } from "next/font/google";
 import { AccentProvider } from "@/components/AccentProvider";
+import { ProfileProvider } from "@/lib/profile-store";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -38,7 +39,9 @@ export default function RootLayout({
       className={`${spaceGrotesk.variable} ${manrope.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full">
-        <AccentProvider>{children}</AccentProvider>
+        <AccentProvider>
+          <ProfileProvider>{children}</ProfileProvider>
+        </AccentProvider>
       </body>
     </html>
   );

@@ -101,6 +101,9 @@ const fragmentShader = /* glsl */ `
     float fog = clamp(1.0 - (vDistance - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
     vec3 final = mix(uFogColor, col, fog);
 
+    // Global 20% dim so the terrain bg sits quieter behind the foreground.
+    final *= 0.8;
+
     // Edge fade on the left/right of the plane so it doesn't end abruptly.
     float edge = smoothstep(0.0, 0.18, vUv.x) * smoothstep(0.0, 0.18, 1.0 - vUv.x);
 

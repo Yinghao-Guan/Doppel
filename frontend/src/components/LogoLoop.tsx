@@ -44,6 +44,11 @@ const ANIMATION_CONFIG = {
   COPY_HEADROOM: 2,
 } as const;
 
+// Persist scroll offset across remounts (e.g. Next.js Fast Refresh in dev).
+// Without this, every HMR rebuild snaps the loop back to position 0.
+const persistedOffset: { current: number } = { current: 0 };
+const persistedVelocity: { current: number } = { current: 0 };
+
 const toCssLength = (value?: number | string): string | undefined =>
   typeof value === "number" ? `${value}px` : (value ?? undefined);
 
@@ -131,8 +136,8 @@ const useAnimationLoop = (
 ) => {
   const rafRef = useRef<number | null>(null);
   const lastTimestampRef = useRef<number | null>(null);
-  const offsetRef = useRef(0);
-  const velocityRef = useRef(0);
+  const offsetRef = useRef(persistedOffset.current);
+  const velocityRef = useRef(persistedVelocity.current);
 
   useEffect(() => {
     const track = trackRef.current;
@@ -179,6 +184,8 @@ const useAnimationLoop = (
         let nextOffset = offsetRef.current + velocityRef.current * deltaTime;
         nextOffset = ((nextOffset % seqSize) + seqSize) % seqSize;
         offsetRef.current = nextOffset;
+        persistedOffset.current = nextOffset;
+        persistedVelocity.current = velocityRef.current;
 
         const transformValue = isVertical
           ? `translate3d(0, ${-offsetRef.current}px, 0)`

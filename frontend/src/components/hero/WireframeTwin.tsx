@@ -33,39 +33,39 @@ const vertexShader = /* glsl */ `
 
 const fragmentShader = /* glsl */ `
   uniform float uTime;
-  uniform vec3 uColorA;  // cool / cyan
-  uniform vec3 uColorB;  // hot / magenta
-  uniform vec3 uColorC;  // accent flash / warm
-  uniform vec3 uRim;     // rim glow color
 
   varying vec3 vNormal;
   varying vec3 vViewDir;
   varying vec3 vWorldPos;
 
+  // HSV → RGB conversion (Iñigo Quilez)
+  vec3 hsv2rgb(vec3 c) {
+    vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
+    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+  }
+
   void main() {
     vec3 N = normalize(vNormal);
     vec3 V = normalize(vViewDir);
 
-    // Fresnel — strong at silhouette edges, faint at facing angles.
-    float fres = pow(1.0 - max(0.0, dot(N, V)), 2.4);
+    // Fresnel — for edge glow + slight hue bias toward silhouette.
+    float fres = pow(1.0 - max(0.0, dot(N, V)), 1.6);
 
-    // Vertical sweep that animates over time (looks like light traveling up the body).
-    float sweep = sin(vWorldPos.y * 1.6 + uTime * 1.3) * 0.5 + 0.5;
+    // Hue sweeps up the body and rotates with time. Slight horizontal shift
+    // adds chromatic separation as the model spins.
+    float hue = vWorldPos.y * 0.18
+              + vWorldPos.x * 0.06
+              + uTime * 0.18
+              + fres * 0.12;
 
-    // Three-stop chroma gradient based on sweep + view angle.
-    vec3 base = mix(uColorA, uColorB, sweep);
-    vec3 mid  = mix(base, uColorC, smoothstep(0.45, 0.95, fres));
+    // Saturated full-spectrum body color (HDR brightness for bloom).
+    vec3 body = hsv2rgb(vec3(fract(hue), 0.95, 1.0)) * 1.8;
 
-    // Rim is the dominant edge color — pushes brightness so bloom catches it.
-    vec3 col = mid + uRim * fres * 1.4;
+    // Strong silhouette edge glow.
+    vec3 col = body + fres * 1.4;
 
-    // Slight boost so the wireframe pops in dark areas
-    col += 0.08;
-
-    // Alpha: slightly transparent overall, more solid at edges (rim).
-    float alpha = 0.55 + fres * 0.45;
-
-    gl_FragColor = vec4(col, alpha);
+    gl_FragColor = vec4(col, 1.0);
   }
 `;
 
@@ -85,14 +85,10 @@ export function WireframeTwin({
         vertexShader,
         fragmentShader,
         wireframe: true,
-        transparent: true,
-        depthWrite: false,
+        transparent: false,
+        toneMapped: false,
         uniforms: {
           uTime: { value: 0 },
-          uColorA: { value: new THREE.Color("#00d9ff") },
-          uColorB: { value: new THREE.Color("#ff2d95") },
-          uColorC: { value: new THREE.Color("#ffe27a") },
-          uRim: { value: new THREE.Color("#ffffff") },
         },
       }),
     [],

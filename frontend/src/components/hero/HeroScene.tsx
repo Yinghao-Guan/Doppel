@@ -35,11 +35,6 @@ export default function HeroScene() {
           <Vignette eskil={false} offset={0.15} darkness={1.4} />
         </EffectComposer>
       </Canvas>
-      {/* Uniform 20% dim over the whole 3D scene */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-black/20"
-      />
       {/* Soft radial dim behind the wordmark so terrain never out-shouts the text */}
       <div
         aria-hidden
