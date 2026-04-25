@@ -102,71 +102,73 @@ export function HeroOverlay() {
   return (
     <div
       ref={rootRef}
-      className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 text-center md:px-12"
+      className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 text-center md:items-start md:px-16 md:text-left lg:px-24"
     >
-      <h1
-        className="doppel-mark relative"
-        aria-label="doppel"
-      >
-        {WORDMARK.map((l, i) => (
-          <span
-            key={i}
-            className="doppel-letter"
-            data-letter={l}
-            style={{ animationDelay: `${i * 0.5}s` }}
-          >
-            {l}
-          </span>
-        ))}
-      </h1>
-
-      <p
-        className="reveal-tagline mt-2 max-w-3xl text-lg font-medium text-[var(--fg)] sm:text-xl md:text-2xl"
-        style={{ textShadow: "0 2px 18px rgba(0,0,0,0.85)" }}
-      >
-        {splitWords("Train smarter by testing your future first.")}
-      </p>
-
-      <p
-        className="reveal-sub reveal mx-auto mt-6 max-w-md text-sm leading-relaxed text-[var(--fg)]/90 md:text-base"
-        style={{ textShadow: "0 2px 16px rgba(0,0,0,0.85)" }}
-      >
-        Real-time pose CV plus a predictive twin that shows how you&apos;ll
-        perform 14 days from now &mdash; before you train.
-      </p>
-
-      <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:gap-4">
-        <Link href="/capture" className="cta cta-primary reveal-cta reveal">
-          Start your twin
-          <ArrowRight size={16} strokeWidth={2.2} />
-        </Link>
-        <Link href="/dashboard" className="cta glass cta-ghost reveal-cta reveal">
-          <Play size={14} strokeWidth={2.2} />
-          See the demo
-        </Link>
-      </div>
-
-      <div
-        className="reveal-cta reveal mt-14 w-full max-w-md"
-        aria-label="Built at BroncoHacks with Next.js and FastAPI"
-      >
-        <p
-          className="mb-3 text-center text-[11px] uppercase tracking-[0.22em] text-[var(--fg)]/55"
-          style={{ textShadow: "0 2px 12px rgba(0,0,0,0.85)" }}
+      <div className="w-full origin-top md:max-w-[55%] md:origin-left md:scale-125 lg:max-w-[52%]">
+        <h1
+          className="doppel-mark relative"
+          aria-label="doppel"
         >
-          Built at BroncoHacks
+          {WORDMARK.map((l, i) => (
+            <span
+              key={i}
+              className="doppel-letter"
+              data-letter={l}
+              style={{ animationDelay: `${i * 0.5}s` }}
+            >
+              {l}
+            </span>
+          ))}
+        </h1>
+
+        <p
+          className="reveal-tagline mt-1 max-w-3xl text-lg font-medium text-[var(--fg)] sm:text-xl md:text-2xl"
+          style={{ textShadow: "0 2px 18px rgba(0,0,0,0.85)" }}
+        >
+          {splitWords("Train smarter by testing your future first.")}
         </p>
-        <LogoLoop
-          logos={BUILT_WITH_LOGOS}
-          speed={50}
-          gap={40}
-          logoHeight={36}
-          pauseOnHover
-          scaleOnHover
-          fadeOut
-          fadeOutColor="#09090b"
-          ariaLabel="Built with"
-        />
+
+        <p
+          className="reveal-sub reveal mt-4 max-w-md text-sm leading-relaxed text-[var(--fg)]/90 md:text-base"
+          style={{ textShadow: "0 2px 16px rgba(0,0,0,0.85)" }}
+        >
+          Real-time pose CV plus a predictive twin that shows how you&apos;ll
+          perform 14 days from now &mdash; before you train.
+        </p>
+
+        <div className="mt-7 flex flex-col items-center gap-3 sm:flex-row sm:gap-4 md:items-start md:justify-start">
+          <Link href="/capture" className="cta cta-primary reveal-cta reveal">
+            Start your twin
+            <ArrowRight size={16} strokeWidth={2.2} />
+          </Link>
+          <Link href="/dashboard" className="cta glass cta-ghost reveal-cta reveal">
+            <Play size={14} strokeWidth={2.2} />
+            See the demo
+          </Link>
+        </div>
+
+        <div
+          className="reveal-cta reveal mt-10 w-full max-w-md"
+          aria-label="Built at BroncoHacks with Next.js and FastAPI"
+        >
+          <p
+            className="mb-3 text-center text-[11px] uppercase tracking-[0.22em] text-[var(--fg)]/55 md:text-left"
+            style={{ textShadow: "0 2px 12px rgba(0,0,0,0.85)" }}
+          >
+            Built at BroncoHacks
+          </p>
+          <LogoLoop
+            logos={BUILT_WITH_LOGOS}
+            speed={50}
+            gap={40}
+            logoHeight={36}
+            pauseOnHover
+            scaleOnHover
+            fadeOut
+            fadeOutColor="#09090b"
+            ariaLabel="Built with"
+          />
+        </div>
       </div>
     </div>
   );

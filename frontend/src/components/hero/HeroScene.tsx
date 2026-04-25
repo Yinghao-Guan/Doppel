@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
 import {
   EffectComposer,
@@ -7,6 +8,7 @@ import {
   Vignette,
 } from "@react-three/postprocessing";
 import { TopoField } from "./TopoField";
+import { WireframeTwin } from "./WireframeTwin";
 
 export default function HeroScene() {
   return (
@@ -19,6 +21,9 @@ export default function HeroScene() {
         <color attach="background" args={["#09090b"]} />
 
         <TopoField />
+        <Suspense fallback={null}>
+          <WireframeTwin position={[3, 0, 0]} scale={1.2} />
+        </Suspense>
 
         <EffectComposer>
           <Bloom
@@ -30,6 +35,11 @@ export default function HeroScene() {
           <Vignette eskil={false} offset={0.15} darkness={1.4} />
         </EffectComposer>
       </Canvas>
+      {/* Uniform 20% dim over the whole 3D scene */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-black/20"
+      />
       {/* Soft radial dim behind the wordmark so terrain never out-shouts the text */}
       <div
         aria-hidden
