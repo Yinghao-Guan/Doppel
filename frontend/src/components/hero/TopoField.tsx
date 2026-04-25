@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import gsap from "gsap";
 import { useAccent } from "@/components/AccentProvider";
 
 const vertexShader = /* glsl */ `
@@ -86,6 +87,7 @@ const fragmentShader = /* glsl */ `
   uniform float uFogNear;
   uniform float uFogFar;
   uniform float uAmp;
+  uniform float uIntensity;
   varying float vHeight;
   varying float vDistance;
   varying vec2 vUv;
@@ -101,8 +103,8 @@ const fragmentShader = /* glsl */ `
     float fog = clamp(1.0 - (vDistance - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
     vec3 final = mix(uFogColor, col, fog);
 
-    // Global 20% dim so the terrain bg sits quieter behind the foreground.
-    final *= 0.8;
+    // Global dim multiplier so the terrain bg sits quieter behind the foreground.
+    final *= uIntensity;
 
     // Edge fade on the left/right of the plane so it doesn't end abruptly.
     float edge = smoothstep(0.0, 0.18, vUv.x) * smoothstep(0.0, 0.18, 1.0 - vUv.x);
@@ -111,8 +113,19 @@ const fragmentShader = /* glsl */ `
   }
 `;
 
-export function TopoField() {
+type TopoFieldProps = {
+  scrollSpeed?: number;
+  intensity?: number;
+  throttleHalf?: boolean;
+};
+
+export function TopoField({
+  scrollSpeed = 1.1,
+  intensity = 0.8,
+  throttleHalf = false,
+}: TopoFieldProps = {}) {
   const matRef = useRef<THREE.ShaderMaterial>(null);
+  const skipRef = useRef(false);
   const { accent } = useAccent();
 
   // Single big subdivided plane lying flat (XZ after rotation), extending forward.
@@ -122,6 +135,10 @@ export function TopoField() {
   );
 
   useFrame((state) => {
+    if (throttleHalf) {
+      skipRef.current = !skipRef.current;
+      if (skipRef.current) return;
+    }
     if (matRef.current) {
       matRef.current.uniforms.uTime.value = state.clock.elapsedTime;
     }
@@ -135,6 +152,24 @@ export function TopoField() {
       .set(accent.accentDeep)
       .multiplyScalar(0.18);
   }, [accent]);
+
+  // Smoothly tween scrollSpeed/intensity when route-driven props change so the
+  // terrain doesn't snap between landing and app modes.
+  useEffect(() => {
+    if (!matRef.current) return;
+    gsap.to(matRef.current.uniforms.uScrollSpeed, {
+      value: scrollSpeed,
+      duration: 0.9,
+      ease: "power2.inOut",
+      overwrite: "auto",
+    });
+    gsap.to(matRef.current.uniforms.uIntensity, {
+      value: intensity,
+      duration: 0.9,
+      ease: "power2.inOut",
+      overwrite: "auto",
+    });
+  }, [scrollSpeed, intensity]);
 
   return (
     <mesh
@@ -152,7 +187,8 @@ export function TopoField() {
         uniforms={{
           uTime: { value: 0 },
           uAmp: { value: 2.6 },
-          uScrollSpeed: { value: 1.1 },
+          uScrollSpeed: { value: scrollSpeed },
+          uIntensity: { value: intensity },
           uColorLow: { value: new THREE.Color("#1e1b4b") },
           uColorHigh: { value: new THREE.Color("#0e7490") },
           uFogColor: { value: new THREE.Color("#09090b") },

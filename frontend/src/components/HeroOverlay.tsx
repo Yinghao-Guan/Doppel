@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import gsap from "gsap";
 import { ArrowRight, Play } from "lucide-react";
 import LogoLoop from "./LogoLoop";
@@ -35,6 +36,26 @@ let introHasPlayed = false;
 
 export function HeroOverlay() {
   const rootRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const isLeavingRef = useRef(false);
+
+  const transitionTo = (href: string) => (e: React.MouseEvent) => {
+    if (isLeavingRef.current) return;
+    e.preventDefault();
+    isLeavingRef.current = true;
+    const main = document.querySelector("main");
+    if (!main) {
+      router.push(href);
+      return;
+    }
+    gsap.to(main, {
+      opacity: 0,
+      filter: "blur(6px)",
+      duration: 0.35,
+      ease: "power2.in",
+      onComplete: () => router.push(href),
+    });
+  };
 
   useEffect(() => {
     if (!rootRef.current) return;
@@ -165,11 +186,19 @@ export function HeroOverlay() {
         </p>
 
         <div className="mt-7 flex flex-col items-center gap-3 sm:flex-row sm:gap-4 md:items-start md:justify-start">
-          <Link href="/capture" className="cta cta-primary reveal-cta reveal">
+          <Link
+            href="/capture"
+            onClick={transitionTo("/capture")}
+            className="cta cta-primary reveal-cta reveal"
+          >
             Start your twin
             <ArrowRight size={16} strokeWidth={2.2} />
           </Link>
-          <Link href="/dashboard" className="cta glass cta-ghost reveal-cta reveal">
+          <Link
+            href="/dashboard"
+            onClick={transitionTo("/dashboard")}
+            className="cta glass cta-ghost reveal-cta reveal"
+          >
             <Play size={14} strokeWidth={2.2} />
             See the demo
           </Link>

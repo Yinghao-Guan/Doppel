@@ -5,8 +5,6 @@ import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 
-useGLTF.preload("/models/wireframe_man.glb");
-
 type WireframeTwinProps = {
   position?: [number, number, number];
   scale?: number;
@@ -75,7 +73,7 @@ export function WireframeTwin({
   rotateY = true,
 }: WireframeTwinProps) {
   const groupRef = useRef<THREE.Group>(null);
-  const { scene } = useGLTF("/models/wireframe_man.glb") as unknown as {
+  const { scene } = useGLTF("/models/wireframe_man.draco.glb") as unknown as {
     scene: THREE.Group;
   };
 
