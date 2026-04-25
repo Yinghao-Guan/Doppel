@@ -1,8 +1,13 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
+import { Loader2 } from "lucide-react";
 import { useAthleteStore } from "@/lib/athlete-store";
+import { useProfile } from "@/lib/profile-store";
+import { useCaptureSignals } from "@/lib/capture-signals";
+import { predict } from "@/lib/predict";
+import type { PredictOutput, ProfileFields } from "@/types/predict";
 import { PoseCamera } from "./PoseCamera";
 
 const SIGNAL_DEFS = [
@@ -50,9 +55,38 @@ const SIGNAL_DEFS = [
   },
 ];
 
+const SCORE_DEFS = [
+  { key: "readiness_score" as const,         label: "READINESS",  tone: "var(--warn)" },
+  { key: "strength_potential_score" as const, label: "STRENGTH",   tone: "var(--accent)" },
+  { key: "endurance_potential_score" as const,label: "ENDURANCE",  tone: "var(--accent-cyan)" },
+  { key: "injury_risk_score" as const,        label: "INJURY RISK",tone: "var(--danger)" },
+];
+
 export function CapturePanel() {
   const fingerprint = useAthleteStore((s) => s.fingerprint);
+  const { profile, isComplete } = useProfile();
+  const cv = useCaptureSignals();
+  const [prediction, setPrediction] = useState<PredictOutput | null>(null);
+  const [predLoading, setPredLoading] = useState(false);
+  const [predError, setPredError] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  // Re-run prediction whenever a completed set is captured.
+  useEffect(() => {
+    if (!fingerprint || fingerprint.totalReps === 0 || !isComplete) return;
+    let cancelled = false;
+    setPredLoading(true);
+    setPredError(null);
+    predict({ ...(profile as ProfileFields), ...cv })
+      .then((res) => { if (!cancelled) { setPrediction(res); setPredLoading(false); } })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setPredError(err instanceof Error ? err.message : "Prediction failed.");
+          setPredLoading(false);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [fingerprint?.timestamp]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!rootRef.current) return;
@@ -140,6 +174,75 @@ export function CapturePanel() {
                 </div>
               </div>
             )}
+
+            {/* Model prediction */}
+            <div className="mt-5 border-t border-[var(--glass-border)] pt-5">
+              <div className="mb-4 flex items-center justify-between">
+                <p className="eyebrow">Model · Readout</p>
+                {predLoading && (
+                  <Loader2
+                    size={13}
+                    strokeWidth={2}
+                    className="animate-spin text-[var(--accent-cyan)]"
+                  />
+                )}
+              </div>
+
+              {predError && (
+                <p className="text-xs text-[var(--danger)]">{predError}</p>
+              )}
+
+              {!isComplete && !predLoading && (
+                <p className="text-xs text-[var(--fg-mute)]">
+                  Set your profile to see model scores.
+                </p>
+              )}
+
+              {prediction && !predLoading && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    {SCORE_DEFS.map((s) => (
+                      <div
+                        key={s.key}
+                        className="rounded-xl border border-[var(--glass-border)] bg-[var(--surface)]/50 p-3"
+                      >
+                        <p className="font-mono text-[10px] tracking-[0.2em] text-[var(--fg-mute)]">
+                          {s.label}
+                        </p>
+                        <p
+                          className="mt-1 font-display text-2xl font-medium"
+                          style={{ color: s.tone }}
+                        >
+                          {Math.round(prediction.scores[s.key])}
+                          <span className="ml-0.5 font-mono text-[10px] text-[var(--fg-mute)]">
+                            %
+                          </span>
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {prediction.summary && (
+                    <p className="mt-4 text-sm leading-relaxed text-[var(--fg-dim)]">
+                      {prediction.summary}
+                    </p>
+                  )}
+
+                  {prediction.recommendations.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {prediction.recommendations.map((r) => (
+                        <span
+                          key={r}
+                          className="rounded-full border border-[var(--glass-border)] bg-[var(--surface)]/50 px-2 py-0.5 font-mono text-[10px] tracking-[0.15em] text-[var(--fg-dim)]"
+                        >
+                          {r}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </>
         ) : (
           <div className="grid grid-cols-2 gap-4">
