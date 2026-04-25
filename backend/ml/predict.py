@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import pickle
+import sys
 from pathlib import Path
 
 
@@ -427,11 +428,22 @@ def parse_args() -> argparse.Namespace:
         help="One of: beginner_bad_form, intermediate_balanced, advanced_good_form, minimal_frontend_input",
     )
     parser.add_argument("--json", action="store_true", help="Print JSON output instead of human-readable output.")
+    parser.add_argument("--stdin-json", action="store_true", help="Read a JSON payload from stdin and run prediction.")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+
+    if args.stdin_json:
+        raw = sys.stdin.read()
+        if not raw.strip():
+            raise SystemExit("Expected JSON payload on stdin.")
+        payload = json.loads(raw)
+        result = predict_athlete_outcome(payload)
+        print(json.dumps(result, indent=2 if args.json else None))
+        return
+
     case_name = args.demo_case or "intermediate_balanced"
     if case_name not in DEMO_CASES:
         raise SystemExit(f"Unknown demo case: {case_name}")

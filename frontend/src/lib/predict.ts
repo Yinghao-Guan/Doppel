@@ -1,9 +1,4 @@
-import type {
-  PredictInput,
-  PredictOutput,
-  PredictSignals,
-  RawPredictInput,
-} from "@/types/predict";
+import type { PredictInput, PredictOutput, RawPredictInput } from "@/types/predict";
 
 const ALIAS_MAP: Record<string, keyof PredictInput> = {
   age: "Age",
@@ -96,139 +91,27 @@ export function normalizeInput(raw: RawPredictInput): PredictInput {
   return out as unknown as PredictInput;
 }
 
-function buildSignals(input: PredictInput): PredictSignals {
-  return {
-    form_quality: round1(clamp(input.avg_form_score, 0, 1) * 100),
-    depth_score: round1(clamp(input.avg_depth_score, 0, 1) * 100),
-    tempo_consistency: round1(clamp(input.tempo_consistency, 0, 1) * 100),
-    stability: round1(clamp(input.stability_score, 0, 1) * 100),
-    fatigue_trend: round1(clamp(1 - input.fatigue_slope, 0, 1) * 100),
-    asymmetry: round1(clamp(1 - (input.left_right_asymmetry ?? 0.1), 0, 1) * 100),
-    range_of_motion: round1(clamp(input.range_of_motion ?? input.avg_depth_score, 0, 1) * 100),
-    movement_quality: round1(clamp(input.movement_quality_score ?? 0.6, 0, 1) * 100),
-  };
-}
-
-function buildSummary(scores: PredictOutput["scores"]): string {
-  const { readiness_score, injury_risk_score } = scores;
-  if (readiness_score >= 70 && injury_risk_score < 30) {
-    return "Movement quality looks strong and injury risk is low. You're ready for a strength-focused session.";
-  }
-  if (injury_risk_score >= 55) {
-    return "Injury risk is elevated. Prioritize mobility and controlled tempo work before adding load.";
-  }
-  if (readiness_score < 50) {
-    return "Readiness is dipping. Recovery, hydration, and a lighter session today will pay off tomorrow.";
-  }
-  return "You're in a balanced zone. A moderate session with focus on form will keep your trajectory climbing.";
-}
-
-function buildExplanations(input: PredictInput, scores: PredictOutput["scores"]): string[] {
-  const out: string[] = [];
-  const mq = (input.movement_quality_score ?? 0.6) * 100;
-  if (mq >= 65) {
-    out.push("Overall movement quality was strong, lifting readiness and strength potential.");
-  } else if (mq < 45) {
-    out.push("Movement quality dipped through the set, dragging readiness down.");
-  }
-
-  if (input.fatigue_slope > 0.35) {
-    out.push("Fatigue built up across the set, lowering readiness and increasing risk.");
-  } else if (input.fatigue_slope < 0.15) {
-    out.push("Fatigue stayed low across the set, supporting endurance potential.");
-  }
-
-  if ((input.left_right_asymmetry ?? 0.1) < 0.12) {
-    out.push("Symmetry stayed controlled, helping keep injury risk low.");
-  } else {
-    out.push("Left/right asymmetry crept up, nudging injury risk higher.");
-  }
-
-  if (input.knee_valgus_risk >= 0.4) {
-    out.push("Knee valgus risk was detected on multiple reps, contributing to injury risk.");
-  }
-
-  if (scores.strength_potential_score >= 70) {
-    out.push("Form and stability metrics suggest strong upside for progressive overload.");
-  }
-
-  return out.slice(0, 4);
-}
-
-function buildRecommendations(input: PredictInput, scores: PredictOutput["scores"]): string[] {
-  const out: string[] = [];
-
-  if (scores.injury_risk_score >= 55) {
-    out.push("Reduce intensity and focus on controlled form work before increasing load.");
-  }
-  if (scores.readiness_score < 50) {
-    out.push("Prioritize recovery, hydration, and lighter training today.");
-  }
-  if (scores.readiness_score >= 70 && scores.injury_risk_score < 35) {
-    out.push("You are ready for progressive overload in the next strength session.");
-  }
-  if (input.knee_valgus_risk >= 0.4) {
-    out.push("Add tempo squats and single-leg work to stabilize the knee track.");
-  }
-  if ((input.left_right_asymmetry ?? 0.1) >= 0.15) {
-    out.push("Mix in unilateral exercises to bring left/right balance back in line.");
-  }
-  if (out.length === 0) {
-    out.push("Hold steady — your training fingerprint is balanced. Re-test in 3 days.");
-  }
-
-  return out.slice(0, 4);
-}
-
-export function mockPredict(canonical: PredictInput): PredictOutput {
-  const form = canonical.avg_form_score;
-  const depth = canonical.avg_depth_score;
-  const tempo = canonical.tempo_consistency;
-  const stability = canonical.stability_score;
-  const fatigue = canonical.fatigue_slope;
-  const knee = canonical.knee_valgus_risk;
-  const asym = canonical.left_right_asymmetry ?? 0.1;
-  const mq = canonical.movement_quality_score ?? 0.6;
-
-  const readiness = clamp(
-    0.32 * form + 0.22 * stability + 0.18 * tempo + 0.18 * mq - 0.25 * fatigue - 0.15 * knee,
-    0,
-    1,
-  );
-  const injury = clamp(
-    0.30 * knee + 0.22 * (1 - form) + 0.18 * fatigue + 0.18 * asym + 0.12 * (1 - stability),
-    0,
-    1,
-  );
-  const strength = clamp(
-    0.30 * form + 0.22 * stability + 0.18 * mq + 0.15 * depth - 0.18 * fatigue - 0.10 * knee,
-    0,
-    1,
-  );
-  const endurance = clamp(
-    0.30 * (1 - fatigue) + 0.22 * tempo + 0.18 * stability + 0.15 * mq + 0.10 * (canonical.Workout_Frequency / 7),
-    0,
-    1,
-  );
-
-  const scores = {
-    readiness_score: round1(readiness * 100),
-    injury_risk_score: round1(injury * 100),
-    strength_potential_score: round1(strength * 100),
-    endurance_potential_score: round1(endurance * 100),
-  };
-
-  return {
-    scores,
-    signals: buildSignals(canonical),
-    summary: buildSummary(scores),
-    explanations: buildExplanations(canonical, scores),
-    recommendations: buildRecommendations(canonical, scores),
-  };
-}
-
 export async function predict(raw: RawPredictInput): Promise<PredictOutput> {
-  const canonical = normalizeInput(raw);
-  await new Promise((r) => setTimeout(r, 320));
-  return mockPredict(canonical);
+  const response = await fetch("/api/predict", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(raw),
+  });
+
+  if (!response.ok) {
+    let message = "Prediction request failed.";
+    try {
+      const payload = (await response.json()) as { error?: string };
+      if (payload.error) {
+        message = payload.error;
+      }
+    } catch {
+      // ignore json parse error and keep generic message
+    }
+    throw new Error(message);
+  }
+
+  return (await response.json()) as PredictOutput;
 }

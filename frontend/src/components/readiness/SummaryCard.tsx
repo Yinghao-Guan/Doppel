@@ -43,7 +43,7 @@ export function SummaryCard({ summary }: Props) {
       <div className="mb-3 flex items-center justify-between">
         <p className="eyebrow">Summary</p>
         <span className="font-mono text-[10px] tracking-[0.3em] text-[var(--fg-mute)]">
-          DOPPEL · LLM
+          DOPPEL · MODEL
         </span>
       </div>
       <p className="font-display text-xl leading-relaxed text-[var(--fg)] sm:text-2xl">

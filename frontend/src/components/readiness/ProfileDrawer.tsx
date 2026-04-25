@@ -17,13 +17,13 @@ type Props = {
   onClose: () => void;
 };
 
-const GENDERS: Gender[] = ["Male", "Female", "Other"];
+const GENDERS: Gender[] = ["Male", "Female"];
 const EXPERIENCE: ExperienceLevel[] = ["Beginner", "Intermediate", "Advanced"];
-const WORKOUTS: WorkoutType[] = ["Strength", "Cardio", "HIIT", "Yoga", "Mixed"];
+const WORKOUTS: WorkoutType[] = ["Strength", "Cardio", "HIIT", "Yoga"];
 
 const DEFAULTS: ProfileFields = {
   Age: 24,
-  Gender: "Other",
+  Gender: "Male",
   Height: 175,
   Weight: 72,
   Workout_Frequency: 4,
