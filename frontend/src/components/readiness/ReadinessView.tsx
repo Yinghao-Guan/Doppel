@@ -20,6 +20,7 @@ export function ReadinessView() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [result, setResult] = useState<PredictOutput | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const openedOnce = useRef(false);
 
@@ -37,13 +38,20 @@ export function ReadinessView() {
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
+    setError(null);
 
     const raw = { ...(profile as ProfileFields), ...cv };
-    predict(raw).then((res) => {
-      if (cancelled) return;
-      setResult(res);
-      setLoading(false);
-    });
+    predict(raw)
+      .then((res) => {
+        if (cancelled) return;
+        setResult(res);
+        setLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : "Failed to run readout.");
+        setLoading(false);
+      });
 
     return () => {
       cancelled = true;
@@ -95,9 +103,11 @@ export function ReadinessView() {
         <EmptyState onOpen={() => setDrawerOpen(true)} />
       )}
 
-      {isComplete && (loading || !result) && <LoadingState />}
+      {isComplete && loading && <LoadingState />}
 
-      {isComplete && result && (
+      {isComplete && error && <ErrorState message={error} />}
+
+      {isComplete && result && !error && (
         <div className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
             <ScoreQuadrant scores={result.scores} />
@@ -155,6 +165,15 @@ function LoadingState() {
         </span>
       </div>
       <div className="scan-sweep" />
+    </div>
+  );
+}
+
+function ErrorState({ message }: { message: string }) {
+  return (
+    <div className="glass rounded-2xl border border-[var(--danger)]/30 p-6 text-sm text-[var(--fg-dim)]">
+      <p className="eyebrow mb-2">Readout error</p>
+      <p>{message}</p>
     </div>
   );
 }

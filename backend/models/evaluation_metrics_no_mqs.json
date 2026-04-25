@@ -1,0 +1,47 @@
+{
+  "metrics": {
+    "readiness_score": {
+      "mae": 0.0254,
+      "rmse": 0.032,
+      "r2": 0.9354
+    },
+    "injury_risk_score": {
+      "mae": 0.0172,
+      "rmse": 0.0222,
+      "r2": 0.9534
+    },
+    "strength_potential_score": {
+      "mae": 0.0193,
+      "rmse": 0.0247,
+      "r2": 0.9654
+    },
+    "endurance_potential_score": {
+      "mae": 0.026,
+      "rmse": 0.0333,
+      "r2": 0.8487
+    }
+  },
+  "prediction_range": {
+    "min_prediction": 0.1084,
+    "max_prediction": 0.8706,
+    "within_expected_range": true
+  },
+  "metadata": {
+    "train_rows": 1207,
+    "test_rows": 302,
+    "categorical_features": [
+      "Gender",
+      "Workout_Type",
+      "Experience_Level"
+    ],
+    "target_features": [
+      "readiness_score",
+      "injury_risk_score",
+      "strength_potential_score",
+      "endurance_potential_score"
+    ],
+    "excluded_features": [
+      "movement_quality_score"
+    ]
+  }
+}

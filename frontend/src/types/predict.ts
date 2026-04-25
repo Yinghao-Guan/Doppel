@@ -1,6 +1,6 @@
-export type Gender = "Male" | "Female" | "Other";
+export type Gender = "Male" | "Female";
 export type ExperienceLevel = "Beginner" | "Intermediate" | "Advanced";
-export type WorkoutType = "Strength" | "Cardio" | "HIIT" | "Yoga" | "Mixed";
+export type WorkoutType = "Strength" | "Cardio" | "HIIT" | "Yoga";
 
 export interface ProfileFields {
   Age: number;
