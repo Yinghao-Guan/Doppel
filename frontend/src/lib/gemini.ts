@@ -69,6 +69,7 @@ type GeminiBody = {
   generationConfig: {
     temperature: number;
     responseMimeType?: string;
+    thinkingConfig?: { thinkingBudget: number };
   };
 };
 
@@ -100,7 +101,10 @@ function toGeminiBody(
   }
   const body: GeminiBody = {
     contents,
-    generationConfig: { temperature },
+    generationConfig: {
+      temperature,
+      thinkingConfig: { thinkingBudget: 0 },
+    },
   };
   if (systemTexts.length > 0) {
     body.systemInstruction = { parts: [{ text: systemTexts.join("\n\n") }] };

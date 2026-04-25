@@ -2,16 +2,26 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import gsap from "gsap";
-import { Sparkles, Loader2, AlertTriangle, Lightbulb } from "lucide-react";
-import { whatIf, CoachClientError } from "@/lib/coach-client";
+import {
+  Sparkles,
+  Loader2,
+  AlertTriangle,
+  Lightbulb,
+  TrendingUp,
+  Flame,
+  Scale,
+  Activity,
+  Check,
+} from "lucide-react";
+import { generatePlan, CoachClientError } from "@/lib/coach-client";
 import type {
   ModelForecast,
   ModelScores,
   ModelSignals,
   PlanCandidate,
+  TargetMetric,
   TrainingFingerprint,
   UserProfile,
-  WhatIfResult,
 } from "@/lib/coach-types";
 
 const PROFILE: UserProfile = {
@@ -79,6 +89,29 @@ const BASELINE_FORECAST: ModelForecast = {
 
 const INTENSITY_LEVELS = ["low", "moderate", "moderate-high", "high"] as const;
 type IntensityLevel = (typeof INTENSITY_LEVELS)[number];
+
+const GOAL_OPTIONS: { value: TargetMetric; label: string }[] = [
+  { value: "strength", label: "Strength" },
+  { value: "endurance", label: "Endurance" },
+  { value: "weight_loss", label: "Weight loss" },
+  { value: "mobility", label: "Mobility" },
+  { value: "general_fitness", label: "General fitness" },
+];
+
+const DEFAULT_CONSTRAINTS = ["no overhead pressing", "home gym only"];
+
+type PhilosophyVisual = { icon: typeof Activity; tone: string };
+function philosophyVisual(philosophy: string): PhilosophyVisual {
+  const p = philosophy.toLowerCase();
+  if (p.includes("progressive") || p.includes("overload")) {
+    return { icon: TrendingUp, tone: "var(--accent-cyan)" };
+  }
+  if (p.includes("intensity")) return { icon: Flame, tone: "var(--danger)" };
+  if (p.includes("balanced") || p.includes("hybrid")) {
+    return { icon: Scale, tone: "var(--accent)" };
+  }
+  return { icon: Activity, tone: "var(--accent)" };
+}
 
 const SCORE_LABEL: Record<keyof ModelScores, string> = {
   readiness_score: "Readiness",
@@ -226,40 +259,20 @@ function buildRecommendations(s: ModelScores, dIntensity: number): string[] {
   return out;
 }
 
-function buildChangeDescription(
-  sessions: number,
-  intensity: IntensityLevel,
-): string {
-  const parts: string[] = [];
-  if (sessions !== BASELINE_PLAN.sessions_per_week) {
-    parts.push(
-      `Move from ${BASELINE_PLAN.sessions_per_week} to ${sessions} sessions per week`,
-    );
-  }
-  if (intensity !== BASELINE_PLAN.intensity) {
-    parts.push(`shift intensity from ${BASELINE_PLAN.intensity} to ${intensity}`);
-  }
-  return parts.length === 0
-    ? "Keep the current plan unchanged."
-    : parts.join(" and ") + ".";
-}
-
 export function WhatIfPanel() {
   const rootRef = useRef<HTMLDivElement>(null);
   const [sessions, setSessions] = useState(5);
   const [intensityIdx, setIntensityIdx] = useState(2);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<WhatIfResult | null>(null);
+  const [plans, setPlans] = useState<PlanCandidate[] | null>(null);
+  const [plansLoading, setPlansLoading] = useState(false);
+  const [plansError, setPlansError] = useState<string | null>(null);
+  const [goalMetric, setGoalMetric] = useState<TargetMetric>("strength");
+  const [appliedPlanIdx, setAppliedPlanIdx] = useState<number | null>(null);
 
   const intensity = INTENSITY_LEVELS[intensityIdx];
   const after = useMemo(
     () => modelAfterForecast(sessions, intensityIdx),
     [sessions, intensityIdx],
-  );
-  const changeDescription = useMemo(
-    () => buildChangeDescription(sessions, intensity),
-    [sessions, intensity],
   );
 
   useEffect(() => {
@@ -277,20 +290,23 @@ export function WhatIfPanel() {
     return () => ctx.revert();
   }, []);
 
-  async function handleAsk() {
-    setLoading(true);
-    setError(null);
-    setResult(null);
+  async function handleGeneratePlans() {
+    setPlansLoading(true);
+    setPlansError(null);
+    setPlans(null);
+    setAppliedPlanIdx(null);
     try {
-      const res = await whatIf({
+      const res = await generatePlan({
         profile: PROFILE,
         fingerprint: FINGERPRINT,
-        current_plan: BASELINE_PLAN,
-        before_predictions: BASELINE_FORECAST,
-        after_predictions: after,
-        change_description: changeDescription,
+        goal: {
+          target_metric: goalMetric,
+          target_change_pct: 15,
+          horizon_days: 14,
+          constraints: DEFAULT_CONSTRAINTS,
+        },
       });
-      setResult(res.result);
+      setPlans(res.plans);
     } catch (err) {
       const msg =
         err instanceof CoachClientError
@@ -298,14 +314,105 @@ export function WhatIfPanel() {
           : err instanceof Error
             ? err.message
             : "Unknown error.";
-      setError(msg);
+      setPlansError(msg);
     } finally {
-      setLoading(false);
+      setPlansLoading(false);
     }
+  }
+
+  function applyPlan(plan: PlanCandidate, idx: number) {
+    setSessions(plan.sessions_per_week);
+    const i = INTENSITY_LEVELS.indexOf(plan.intensity as IntensityLevel);
+    if (i >= 0) setIntensityIdx(i);
+    setAppliedPlanIdx(idx);
   }
 
   return (
     <div ref={rootRef} className="mt-10 space-y-8">
+      {/* plan suggestions */}
+      <div className="wi-fade glass rounded-2xl p-7">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="font-mono text-[10px] tracking-[0.3em] text-[var(--fg-mute)]">
+              SUGGESTED PLANS
+            </p>
+            <h2 className="mt-1 font-display text-xl font-medium text-[var(--fg)]">
+              Three coach-authored options
+            </h2>
+            <p className="mt-1 text-sm text-[var(--fg-dim)]">
+              Generated from your profile + fingerprint. Tap one to load it
+              into the sliders below.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="font-mono text-[10px] tracking-[0.25em] text-[var(--fg-mute)]">
+                GOAL
+              </span>
+              <select
+                value={goalMetric}
+                onChange={(e) =>
+                  setGoalMetric(e.target.value as TargetMetric)
+                }
+                className="rounded-lg border border-[var(--glass-border)] bg-[var(--surface-2)] px-3 py-2 text-sm text-[var(--fg)] outline-none focus:border-[var(--accent)]"
+              >
+                {GOAL_OPTIONS.map((g) => (
+                  <option key={g.value} value={g.value}>
+                    {g.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              onClick={handleGeneratePlans}
+              disabled={plansLoading}
+              className="cta glass inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-xs font-mono tracking-[0.2em] transition-opacity hover:opacity-90 disabled:opacity-50"
+              style={{
+                background: "var(--accent-cyan)",
+                color: "#0a0a0a",
+                boxShadow: "0 12px 36px -12px var(--accent-cyan)",
+              }}
+            >
+              {plansLoading ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  GENERATING…
+                </>
+              ) : (
+                <>
+                  <Sparkles size={14} />
+                  GENERATE 3 PLANS
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {plansError && (
+          <div className="mt-5 flex items-start gap-3 rounded-xl border border-[var(--glass-border)] bg-[var(--surface-2)] p-4 text-sm text-[var(--fg-dim)]">
+            <AlertTriangle
+              size={16}
+              className="mt-0.5 shrink-0 text-[var(--danger)]"
+            />
+            <p>{plansError}</p>
+          </div>
+        )}
+
+        {plans && (
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            {plans.map((p, i) => (
+              <PlanCard
+                key={i}
+                plan={p}
+                index={i}
+                applied={appliedPlanIdx === i}
+                onApply={() => applyPlan(p, i)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* sliders */}
       <div className="wi-fade glass grid gap-7 rounded-2xl p-7 md:grid-cols-2">
         <Slider
@@ -333,10 +440,6 @@ export function WhatIfPanel() {
           <code className="mx-1 rounded bg-[var(--surface-2)] px-1 py-0.5 text-[10px] text-[var(--fg-dim)]">
             /api/forecast
           </code>
-          . The coach narrative below is live from
-          <code className="mx-1 rounded bg-[var(--surface-2)] px-1 py-0.5 text-[10px] text-[var(--fg-dim)]">
-            /api/coach/what-if
-          </code>
           .
         </p>
       </div>
@@ -356,100 +459,110 @@ export function WhatIfPanel() {
           accent
         />
       </div>
+    </div>
+  );
+}
 
-      {/* change description + ask button */}
-      <div className="wi-fade glass rounded-2xl p-7">
-        <p className="font-mono text-[10px] tracking-[0.3em] text-[var(--fg-mute)]">
-          CHANGE
-        </p>
-        <p className="mt-3 text-base text-[var(--fg)]">{changeDescription}</p>
-        <button
-          onClick={handleAsk}
-          disabled={loading}
-          className="cta glass mt-6 inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-xs font-mono tracking-[0.2em] text-[var(--fg)] transition-opacity hover:opacity-90 disabled:opacity-50"
-          style={{
-            background: "var(--accent)",
-            color: "#fff",
-            boxShadow: "0 12px 36px -12px var(--accent)",
-          }}
+function PlanCard({
+  plan,
+  index,
+  applied,
+  onApply,
+}: {
+  plan: PlanCandidate;
+  index: number;
+  applied: boolean;
+  onApply: () => void;
+}) {
+  const { icon: Icon, tone } = philosophyVisual(plan.philosophy);
+  const mix = plan.exercise_mix;
+  return (
+    <div
+      className="glass relative flex flex-col rounded-2xl p-5 transition-all"
+      style={
+        applied
+          ? {
+              boxShadow: `inset 0 1px 0 0 var(--glass-highlight), 0 18px 50px -16px ${tone}`,
+              borderColor: tone,
+            }
+          : undefined
+      }
+    >
+      {applied && (
+        <span
+          className="absolute right-4 top-4 flex h-6 w-6 items-center justify-center rounded-full text-white"
+          style={{ background: tone }}
         >
-          {loading ? (
-            <>
-              <Loader2 size={14} className="animate-spin" />
-              ASKING THE COACH…
-            </>
-          ) : (
-            <>
-              <Sparkles size={14} />
-              ASK THE COACH
-            </>
-          )}
-        </button>
+          <Check size={14} strokeWidth={3} />
+        </span>
+      )}
+      <div
+        className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg"
+        style={{ background: `${tone}22`, color: tone }}
+      >
+        <Icon size={18} strokeWidth={1.8} />
+      </div>
+      <p className="font-mono text-[10px] tracking-[0.3em] text-[var(--fg-mute)]">
+        OPTION {String.fromCharCode(65 + index)} · {plan.philosophy.toUpperCase()}
+      </p>
+      <h3 className="mt-1 font-display text-lg font-medium text-[var(--fg)]">
+        {plan.plan_name}
+      </h3>
+
+      <div className="mt-4 flex items-center gap-4 text-sm">
+        <div>
+          <p className="font-mono text-[10px] tracking-[0.25em] text-[var(--fg-mute)]">
+            SESSIONS
+          </p>
+          <p className="mt-0.5 font-display text-xl text-[var(--fg)]">
+            {plan.sessions_per_week}×
+          </p>
+        </div>
+        <div>
+          <p className="font-mono text-[10px] tracking-[0.25em] text-[var(--fg-mute)]">
+            INTENSITY
+          </p>
+          <p className="mt-0.5 font-display text-base capitalize text-[var(--fg)]">
+            {plan.intensity}
+          </p>
+        </div>
       </div>
 
-      {/* error */}
-      {error && (
-        <div className="wi-fade glass flex items-start gap-3 rounded-2xl p-5 text-sm text-[var(--fg-dim)]">
-          <AlertTriangle
-            size={16}
-            className="mt-0.5 shrink-0 text-[var(--danger)]"
-          />
-          <div>
-            <p className="font-mono text-[10px] tracking-[0.3em] text-[var(--danger)]">
-              ERROR
-            </p>
-            <p className="mt-1">{error}</p>
-          </div>
-        </div>
-      )}
-
-      {/* coach response */}
-      {result && (
-        <div className="wi-fade space-y-5">
-          {Object.keys(result.parameter_changes).length > 0 && (
-            <div className="glass rounded-2xl p-6">
-              <p className="font-mono text-[10px] tracking-[0.3em] text-[var(--fg-mute)]">
-                PARAMETER CHANGES
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {Object.entries(result.parameter_changes).map(([k, v]) => (
-                  <span
-                    key={k}
-                    className="rounded-md border border-[var(--glass-border)] bg-[var(--surface-2)] px-3 py-1.5 font-mono text-xs text-[var(--fg-dim)]"
-                  >
-                    <span className="text-[var(--fg-mute)]">{k}:</span>{" "}
-                    <span className="text-[var(--fg)]">{v}</span>
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="glass rounded-2xl p-6">
-            <p className="font-mono text-[10px] tracking-[0.3em] text-[var(--fg-mute)]">
-              INTERPRETATION
-            </p>
-            <p className="mt-3 text-base leading-relaxed text-[var(--fg-dim)]">
-              {result.interpretation}
-            </p>
-          </div>
-
+      <div className="mt-4">
+        <p className="font-mono text-[10px] tracking-[0.25em] text-[var(--fg-mute)]">
+          MIX
+        </p>
+        <div className="mt-1.5 flex h-2 overflow-hidden rounded-full bg-[var(--surface-2)]">
           <div
-            className="glass rounded-2xl p-6"
-            style={{
-              boxShadow:
-                "inset 0 1px 0 0 var(--glass-highlight), 0 18px 50px -16px var(--accent)",
-            }}
-          >
-            <p className="font-mono text-[10px] tracking-[0.3em] text-[var(--accent)]">
-              KEY INSIGHT
-            </p>
-            <p className="mt-3 font-display text-xl font-medium leading-snug text-[var(--fg)]">
-              {result.key_insight}
-            </p>
-          </div>
+            style={{ width: `${mix.strength * 100}%`, background: "var(--accent)" }}
+            title={`Strength ${Math.round(mix.strength * 100)}%`}
+          />
+          <div
+            style={{ width: `${mix.cardio * 100}%`, background: "var(--accent-cyan)" }}
+            title={`Cardio ${Math.round(mix.cardio * 100)}%`}
+          />
+          <div
+            style={{ width: `${mix.mobility * 100}%`, background: "var(--success)" }}
+            title={`Mobility ${Math.round(mix.mobility * 100)}%`}
+          />
         </div>
-      )}
+        <div className="mt-1.5 flex justify-between font-mono text-[10px] text-[var(--fg-mute)]">
+          <span>S {Math.round(mix.strength * 100)}%</span>
+          <span>C {Math.round(mix.cardio * 100)}%</span>
+          <span>M {Math.round(mix.mobility * 100)}%</span>
+        </div>
+      </div>
+
+      <p className="mt-4 flex-1 text-xs leading-relaxed text-[var(--fg-dim)]">
+        {plan.rationale}
+      </p>
+
+      <button
+        onClick={onApply}
+        className="mt-5 w-full rounded-lg border border-[var(--glass-border)] bg-[var(--surface-2)] py-2 font-mono text-[10px] tracking-[0.25em] text-[var(--fg-dim)] transition-colors hover:border-[var(--accent)] hover:text-[var(--fg)]"
+      >
+        {applied ? "APPLIED ✓" : "USE THIS PLAN"}
+      </button>
     </div>
   );
 }
