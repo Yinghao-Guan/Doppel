@@ -8,14 +8,16 @@
  * ─────────────────────────────────────────────────────────────────────────
  * CALIBRATION NOTES
  * ─────────────────────────────────────────────────────────────────────────
- *   Athlete:        TBD (record name + height when calibrating)
- *   Camera distance: ~2.0 m, side-on (phone at hip height)
- *   Lighting:        Natural daylight, no direct backlight
- *   Trial counts:    >=3 sets of 5 squats, indoor practice room
+ *   Athlete:        Md Safkatul Islam (P1, demo athlete)
+ *   Camera:         USB2.0 FHD UVC WebCam, ~2.0 m, near-frontal angle
+ *   Lighting:       Indoor, light wall background, even lighting
+ *   Trials:         3 sets — 9/9, 7/7, 10/10 (100% accuracy)
+ *   Form score live: 89% (avg 80% across the set)
+ *   Verified:       2026-04-25, BroncoHacks demo build
  *
- * Update STAND_ANGLE_DEG / BOTTOM_ANGLE_DEG after recording trials with the
- * actual demo athlete. Numbers below are tuned for an intermediate lifter
- * with a moderate squat depth (about parallel).
+ * The defaults below (BOTTOM 110°, STAND 160°, MIN_FRAMES 3) are demo-locked
+ * for the above athlete and setup. If swapping the demo athlete or moving
+ * to a different room, re-run the calibration protocol in plan §7.
  */
 
 /**
