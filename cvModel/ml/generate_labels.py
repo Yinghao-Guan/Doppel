@@ -16,8 +16,8 @@ TARGET_FEATURES = [
 
 EXPERIENCE_SCORES = {
     "Beginner": 0.35,
-    "Intermediate": 0.65,
-    "Advanced": 0.90,
+    "Intermediate": 0.60,
+    "Advanced": 0.80,
 }
 
 
@@ -37,22 +37,24 @@ def normalize(value: float, min_value: float, max_value: float) -> float:
 
 def calculate_recovery_score(row: dict[str, str]) -> float:
     resting_bpm = float(row["Resting_BPM"])
-    fatigue_slope = float(row["fatigue_slope"])
     water_intake = float(row["Water_Intake"])
+    bmi = float(row["BMI"])
 
-    resting_component = 1.0 - normalize(resting_bpm, 50.0, 90.0)
-    hydration_component = normalize(water_intake, 1.5, 4.0)
+    resting_component = 1.0 - normalize(resting_bpm, 45.0, 95.0)
+    hydration_component = normalize(water_intake, 1.0, 4.0)
+    bmi_component = clamp(1.0 - abs(bmi - 22.0) / 18.0)
+
     recovery_score = (
-        0.60 * resting_component
-        + 0.25 * hydration_component
-        + 0.15 * (1.0 - fatigue_slope)
+        0.45 * resting_component
+        + 0.30 * hydration_component
+        + 0.25 * bmi_component
     )
     return clamp(recovery_score)
 
 
 def calculate_hydration_score(row: dict[str, str]) -> float:
     water_intake = float(row["Water_Intake"])
-    return clamp(normalize(water_intake, 1.5, 4.0))
+    return clamp(normalize(water_intake, 1.0, 4.0))
 
 
 def calculate_workout_frequency_score(row: dict[str, str]) -> float:
@@ -62,17 +64,21 @@ def calculate_workout_frequency_score(row: dict[str, str]) -> float:
 
 def calculate_session_duration_score(row: dict[str, str]) -> float:
     session_duration = float(row["Session_Duration"])
-    return clamp(normalize(session_duration, 0.5, 2.0))
+    return clamp(normalize(session_duration, 0.25, 2.0))
 
 
 def calculate_cardio_signal(row: dict[str, str]) -> float:
     avg_bpm = float(row["Avg_BPM"])
     max_bpm = float(row["Max_BPM"])
-    resting_bpm = float(row["Resting_BPM"])
+    session_duration_score = calculate_session_duration_score(row)
+    workout_frequency_score = calculate_workout_frequency_score(row)
 
-    effort_component = clamp(avg_bpm / max(max_bpm, 1.0))
-    recovery_component = 1.0 - normalize(resting_bpm, 50.0, 90.0)
-    return clamp(0.65 * effort_component + 0.35 * recovery_component)
+    heart_rate_load = clamp(avg_bpm / max(max_bpm, 1.0))
+    return clamp(
+        0.45 * heart_rate_load
+        + 0.30 * session_duration_score
+        + 0.25 * workout_frequency_score
+    )
 
 
 def calculate_experience_score(row: dict[str, str]) -> float:
@@ -95,11 +101,14 @@ def generate_labels(row: dict[str, str]) -> dict[str, float]:
     cardio_signal = calculate_cardio_signal(row)
 
     readiness_score = clamp(
-        0.30 * movement_quality_score
-        + 0.25 * recovery_score
-        + 0.20 * experience_score
-        + 0.15 * hydration_score
-        - 0.20 * fatigue_slope
+        0.24 * movement_quality_score
+        + 0.24 * recovery_score
+        + 0.16 * avg_form_score
+        + 0.12 * float(row["tempo_consistency"])
+        + 0.10 * float(row["stability_score"])
+        + 0.08 * float(row["avg_depth_score"])
+        + 0.08 * experience_score
+        - 0.18 * fatigue_slope
     )
 
     injury_risk_score = clamp(
@@ -111,19 +120,25 @@ def generate_labels(row: dict[str, str]) -> dict[str, float]:
     )
 
     strength_potential_score = clamp(
-        0.30 * movement_quality_score
-        + 0.25 * workout_frequency_score
-        + 0.20 * experience_score
-        + 0.15 * session_duration_score
-        - 0.15 * fatigue_slope
+        0.22 * movement_quality_score
+        + 0.24 * avg_form_score
+        + 0.18 * float(row["avg_depth_score"])
+        + 0.12 * float(row["stability_score"])
+        + 0.12 * workout_frequency_score
+        + 0.08 * experience_score
+        + 0.08 * session_duration_score
+        + 0.06 * float(row["tempo_consistency"])
+        - 0.16 * fatigue_slope
     )
 
     endurance_potential_score = clamp(
         0.30 * cardio_signal
-        + 0.25 * workout_frequency_score
         + 0.20 * session_duration_score
-        + 0.15 * recovery_score
-        - 0.10 * fatigue_slope
+        + 0.16 * workout_frequency_score
+        + 0.12 * float(row["tempo_consistency"])
+        + 0.10 * recovery_score
+        + 0.08 * movement_quality_score
+        - 0.20 * fatigue_slope
     )
 
     return {

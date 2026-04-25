@@ -3,40 +3,40 @@
     "name": "high_form_low_fatigue",
     "description": "High form + low fatigue should yield high readiness and low injury risk.",
     "prediction": {
-      "readiness_score": 0.7165,
-      "injury_risk_score": 0.1189,
-      "strength_potential_score": 0.6108,
-      "endurance_potential_score": 0.5677
+      "readiness_score": 0.8254,
+      "injury_risk_score": 0.1111,
+      "strength_potential_score": 0.8731,
+      "endurance_potential_score": 0.5725
     }
   },
   {
     "name": "low_form_high_fatigue",
     "description": "Low form + high fatigue should yield low readiness and high injury risk.",
     "prediction": {
-      "readiness_score": 0.1877,
-      "injury_risk_score": 0.486,
-      "strength_potential_score": 0.3397,
-      "endurance_potential_score": 0.4769
+      "readiness_score": 0.3587,
+      "injury_risk_score": 0.5364,
+      "strength_potential_score": 0.4362,
+      "endurance_potential_score": 0.5019
     }
   },
   {
     "name": "advanced_vs_beginner_baseline",
     "description": "Advanced athlete baseline should differ from beginner baseline under similar physical profile.",
     "prediction": {
-      "readiness_score": 0.6262,
-      "injury_risk_score": 0.1545,
-      "strength_potential_score": 0.5805,
-      "endurance_potential_score": 0.5136
+      "readiness_score": 0.7933,
+      "injury_risk_score": 0.141,
+      "strength_potential_score": 0.8451,
+      "endurance_potential_score": 0.5684
     }
   },
   {
     "name": "beginner_baseline",
     "description": "Beginner baseline companion case for comparison with advanced athlete.",
     "prediction": {
-      "readiness_score": 0.4231,
-      "injury_risk_score": 0.3312,
-      "strength_potential_score": 0.3677,
-      "endurance_potential_score": 0.4966
+      "readiness_score": 0.5936,
+      "injury_risk_score": 0.2942,
+      "strength_potential_score": 0.6386,
+      "endurance_potential_score": 0.4993
     }
   }
 ]

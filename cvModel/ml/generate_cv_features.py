@@ -219,12 +219,13 @@ def generate_cv_features(row: dict[str, object], rng: random.Random) -> dict[str
     rep_count = max(4, rep_baseline + rep_adjustment)
 
     movement_quality_score = clamp(
-        0.30 * avg_form_score
+        0.28 * avg_form_score
         + 0.20 * avg_depth_score
-        + 0.20 * tempo_consistency
-        + 0.20 * stability_score
-        + 0.10 * range_of_motion
-        - 0.10 * left_right_asymmetry
+        + 0.18 * tempo_consistency
+        + 0.18 * stability_score
+        + 0.12 * range_of_motion
+        - 0.06 * left_right_asymmetry
+        - 0.05 * fatigue_slope
     )
 
     return {

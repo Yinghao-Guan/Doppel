@@ -1,29 +1,29 @@
 {
   "metrics": {
     "readiness_score": {
-      "mae": 0.0217,
-      "rmse": 0.0274,
-      "r2": 0.9539
+      "mae": 0.0209,
+      "rmse": 0.0268,
+      "r2": 0.9544
     },
     "injury_risk_score": {
-      "mae": 0.0213,
-      "rmse": 0.0283,
-      "r2": 0.9239
+      "mae": 0.0184,
+      "rmse": 0.0242,
+      "r2": 0.9444
     },
     "strength_potential_score": {
-      "mae": 0.0202,
-      "rmse": 0.0264,
-      "r2": 0.9376
+      "mae": 0.0144,
+      "rmse": 0.0187,
+      "r2": 0.9801
     },
     "endurance_potential_score": {
-      "mae": 0.0304,
-      "rmse": 0.0384,
-      "r2": 0.7841
+      "mae": 0.027,
+      "rmse": 0.035,
+      "r2": 0.8327
     }
   },
   "prediction_range": {
-    "min_prediction": 0.1258,
-    "max_prediction": 0.7252,
+    "min_prediction": 0.1086,
+    "max_prediction": 0.8765,
     "within_expected_range": true
   },
   "metadata": {
