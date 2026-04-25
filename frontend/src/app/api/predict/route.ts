@@ -6,6 +6,14 @@ import path from "node:path";
 function resolveModelScript(): { scriptPath: string; cwd: string } {
   const candidates = [
     {
+      scriptPath: path.resolve(process.cwd(), "..", "backend", "ml", "predict.py"),
+      cwd: path.resolve(process.cwd(), "..", "backend"),
+    },
+    {
+      scriptPath: path.resolve(process.cwd(), "backend", "ml", "predict.py"),
+      cwd: path.resolve(process.cwd(), "backend"),
+    },
+    {
       scriptPath: path.resolve(process.cwd(), "..", "cvModel", "ml", "predict.py"),
       cwd: path.resolve(process.cwd(), "..", "cvModel"),
     },
@@ -21,7 +29,7 @@ function resolveModelScript(): { scriptPath: string; cwd: string } {
     }
   }
 
-  throw new Error("Could not locate cvModel/ml/predict.py");
+  throw new Error("Could not locate backend/ml/predict.py");
 }
 
 export async function POST(request: Request) {
