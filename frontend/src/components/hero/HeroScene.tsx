@@ -6,43 +6,39 @@ import {
   Bloom,
   Vignette,
 } from "@react-three/postprocessing";
-import { TwinOrb } from "./TwinOrb";
+import { TopoField } from "./TopoField";
 
 export default function HeroScene() {
   return (
-    <div className="absolute inset-0 -z-10">
+    <div className="absolute inset-0 z-0">
       <Canvas
         dpr={[1, 1.5]}
-        camera={{ position: [0, 0, 3.4], fov: 42 }}
+        camera={{ position: [0, 1.6, 6], fov: 65, near: 0.1, far: 200 }}
         gl={{ antialias: true, alpha: false }}
       >
         <color attach="background" args={["#09090b"]} />
-        <ambientLight intensity={0.15} />
-        <pointLight
-          position={[3, 2, 4]}
-          color="#a78bfa"
-          intensity={2.4}
-          distance={10}
-        />
-        <pointLight
-          position={[-3, -1, 2]}
-          color="#22d3ee"
-          intensity={1.6}
-          distance={10}
-        />
 
-        <TwinOrb />
+        <TopoField />
 
         <EffectComposer>
           <Bloom
-            intensity={0.9}
-            luminanceThreshold={0.15}
-            luminanceSmoothing={0.4}
+            intensity={0.4}
+            luminanceThreshold={0.4}
+            luminanceSmoothing={0.5}
             mipmapBlur
           />
-          <Vignette eskil={false} offset={0.3} darkness={0.85} />
+          <Vignette eskil={false} offset={0.15} darkness={1.4} />
         </EffectComposer>
       </Canvas>
+      {/* Soft radial dim behind the wordmark so terrain never out-shouts the text */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse 65% 55% at 50% 50%, rgba(9,9,11,0.92) 0%, rgba(9,9,11,0.7) 35%, rgba(9,9,11,0.25) 70%, rgba(9,9,11,0) 100%)",
+        }}
+      />
     </div>
   );
 }

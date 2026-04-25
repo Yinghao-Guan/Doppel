@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, Manrope, JetBrains_Mono } from "next/font/google";
+import { AccentProvider } from "@/components/AccentProvider";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -21,7 +22,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Doppel — Train smarter by testing your future first",
+  title: "doppel — Train smarter by testing your future first",
   description:
     "Doppel builds an AI digital twin of your athletic performance. Real-time pose CV plus predictive modeling shows how you'll perform 14 days from now — before you train.",
 };
@@ -36,7 +37,9 @@ export default function RootLayout({
       lang="en"
       className={`${spaceGrotesk.variable} ${manrope.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        <AccentProvider>{children}</AccentProvider>
+      </body>
     </html>
   );
 }

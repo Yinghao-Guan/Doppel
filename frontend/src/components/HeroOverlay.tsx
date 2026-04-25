@@ -1,37 +1,48 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef } from "react";
+import Link from "next/link";
 import gsap from "gsap";
-import { animate, stagger } from "animejs";
 import { ArrowRight, Play } from "lucide-react";
+
+const WORDMARK = ["d", "o", "p", "p", "e", "l"];
 
 export function HeroOverlay() {
   const rootRef = useRef<HTMLDivElement>(null);
-  const headlineRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     if (!rootRef.current) return;
 
     const ctx = gsap.context(() => {
-      const tl = gsap.timeline({
-        defaults: { ease: "power3.out", duration: 0.8 },
+      gsap.set(".doppel-letter", {
+        opacity: 0,
+        y: 80,
+        scale: 0.85,
+        filter: "blur(20px)",
       });
-      tl.to(".reveal-eyebrow", {
+
+      const tl = gsap.timeline({
+        defaults: { ease: "power4.out" },
+      });
+
+      tl.to(".doppel-letter", {
         opacity: 1,
         y: 0,
+        scale: 1,
         filter: "blur(0px)",
-        duration: 0.6,
+        duration: 1.1,
+        stagger: 0.07,
       })
         .to(
-          ".reveal-headline > span",
+          ".reveal-tagline > span",
           {
             opacity: 1,
             y: 0,
             filter: "blur(0px)",
-            stagger: 0.04,
+            stagger: 0.035,
             duration: 0.7,
           },
-          "-=0.3",
+          "-=0.55",
         )
         .to(
           ".reveal-sub",
@@ -48,116 +59,85 @@ export function HeroOverlay() {
             duration: 0.6,
           },
           "-=0.45",
-        )
-        .to(
-          ".reveal-meta",
-          { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.7 },
-          "-=0.3",
         );
+
+      // Subtle perpetual float on each letter, individually phase-shifted.
+      gsap.utils.toArray<HTMLElement>(".doppel-letter").forEach((el, i) => {
+        gsap.to(el, {
+          y: "+=8",
+          duration: 2.4 + i * 0.18,
+          repeat: -1,
+          yoyo: true,
+          ease: "sine.inOut",
+          delay: 1.2 + i * 0.05,
+        });
+      });
     }, rootRef);
 
-    const meta = rootRef.current.querySelectorAll(".meta-dot");
-    const animeInstance = animate(meta, {
-      opacity: [{ to: [0.35, 1] }, { to: 0.35 }],
-      duration: 1800,
-      delay: stagger(220),
-      loop: true,
-      ease: "inOutSine",
-    });
-
-    return () => {
-      ctx.revert();
-      animeInstance.pause();
-    };
+    return () => ctx.revert();
   }, []);
 
   return (
     <div
       ref={rootRef}
-      className="relative z-10 flex min-h-screen w-full flex-col"
+      className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 text-center md:px-12"
     >
-      {/* top nav */}
-      <header className="flex items-center justify-between px-8 py-6 md:px-14">
-        <div className="flex items-center gap-2.5">
-          <div className="h-2 w-2 rounded-full bg-[var(--accent)] shadow-[0_0_12px_var(--accent)]" />
-          <span className="font-mono text-xs tracking-[0.32em] text-[var(--fg)]">
-            DOPPEL
+      <h1
+        className="doppel-mark relative"
+        aria-label="doppel"
+      >
+        {WORDMARK.map((l, i) => (
+          <span
+            key={i}
+            className="doppel-letter"
+            data-letter={l}
+            style={{ animationDelay: `${i * 0.5}s` }}
+          >
+            {l}
           </span>
-        </div>
-        <nav className="hidden items-center gap-8 md:flex">
-          <a className="font-mono text-xs tracking-[0.2em] text-[var(--fg-dim)] hover:text-[var(--fg)] transition-colors" href="#how">
-            HOW IT WORKS
-          </a>
-          <a className="font-mono text-xs tracking-[0.2em] text-[var(--fg-dim)] hover:text-[var(--fg)] transition-colors" href="#stack">
-            STACK
-          </a>
-          <a className="font-mono text-xs tracking-[0.2em] text-[var(--fg-dim)] hover:text-[var(--fg)] transition-colors" href="#team">
-            TEAM
-          </a>
-        </nav>
-        <button className="cta glass cta-ghost reveal-cta reveal text-xs font-mono tracking-[0.2em] py-2 px-4">
-          BRONCOHACKS&apos;26
-        </button>
-      </header>
+        ))}
+      </h1>
 
-      {/* hero center */}
-      <section className="flex flex-1 flex-col items-center justify-center px-6 text-center md:px-12">
-        <p className="eyebrow reveal-eyebrow reveal mb-6">
-          Digital twin · Athletic performance
-        </p>
-        <h1
-          ref={headlineRef}
-          className="headline reveal-headline mx-auto max-w-5xl text-4xl text-[var(--fg)] sm:text-5xl md:text-6xl lg:text-7xl"
-        >
-          {splitWords(
-            "Train smarter by testing your future first.",
-          )}
-        </h1>
-        <p className="reveal-sub reveal mx-auto mt-7 max-w-xl text-base leading-relaxed text-[var(--fg-dim)] md:text-lg">
-          Your camera captures how you train today. Your AI twin predicts how
-          you&apos;ll perform two weeks from now &mdash; before you train.
-        </p>
-        <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:gap-4">
-          <button className="cta cta-primary reveal-cta reveal">
-            Start your twin
-            <ArrowRight size={16} strokeWidth={2.2} />
-          </button>
-          <button className="cta glass cta-ghost reveal-cta reveal">
-            <Play size={14} strokeWidth={2.2} />
-            Watch demo
-          </button>
-        </div>
-      </section>
+      <p
+        className="reveal-tagline mt-2 max-w-3xl text-lg font-medium text-[var(--fg)] sm:text-xl md:text-2xl"
+        style={{ textShadow: "0 2px 18px rgba(0,0,0,0.85)" }}
+      >
+        {splitWords("Train smarter by testing your future first.")}
+      </p>
 
-      {/* footer meta strip */}
-      <footer className="flex flex-col items-center justify-between gap-4 px-8 pb-8 md:flex-row md:px-14">
-        <div className="reveal-meta reveal flex items-center gap-3 font-mono text-[10px] tracking-[0.3em] text-[var(--fg-mute)]">
-          <span className="meta-dot h-1.5 w-1.5 rounded-full bg-[var(--success)] inline-block" />
-          POSE-CV READY
-          <span className="mx-3 h-px w-6 bg-[var(--fg-mute)]/40" />
-          <span className="meta-dot h-1.5 w-1.5 rounded-full bg-[var(--accent-cyan)] inline-block" />
-          14-DAY FORECAST
-          <span className="mx-3 h-px w-6 bg-[var(--fg-mute)]/40" />
-          <span className="meta-dot h-1.5 w-1.5 rounded-full bg-[var(--accent)] inline-block" />
-          LLM COACH
-        </div>
-        <div className="reveal-meta reveal font-mono text-[10px] tracking-[0.3em] text-[var(--fg-mute)]">
-          v0.0.1 · doppel-frontend
-        </div>
-      </footer>
+      <p
+        className="reveal-sub reveal mx-auto mt-6 max-w-md text-sm leading-relaxed text-[var(--fg)]/90 md:text-base"
+        style={{ textShadow: "0 2px 16px rgba(0,0,0,0.85)" }}
+      >
+        Real-time pose CV plus a predictive twin that shows how you&apos;ll
+        perform 14 days from now &mdash; before you train.
+      </p>
+
+      <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:gap-4">
+        <Link href="/capture" className="cta cta-primary reveal-cta reveal">
+          Start your twin
+          <ArrowRight size={16} strokeWidth={2.2} />
+        </Link>
+        <Link href="/dashboard" className="cta glass cta-ghost reveal-cta reveal">
+          <Play size={14} strokeWidth={2.2} />
+          See the demo
+        </Link>
+      </div>
     </div>
   );
 }
 
 function splitWords(text: string) {
-  return text.split(" ").map((word, i) => (
-    <span
-      key={i}
-      className="reveal inline-block opacity-0 will-change-transform"
-      style={{ transform: "translateY(14px)", filter: "blur(6px)" }}
-    >
-      {word}
-      {i < text.split(" ").length - 1 && " "}
-    </span>
+  const words = text.split(" ");
+  return words.map((word, i) => (
+    <Fragment key={i}>
+      <span
+        className="inline-block opacity-0 will-change-transform"
+        style={{ transform: "translateY(12px)", filter: "blur(6px)" }}
+      >
+        {word}
+      </span>
+      {i < words.length - 1 ? " " : null}
+    </Fragment>
   ));
 }

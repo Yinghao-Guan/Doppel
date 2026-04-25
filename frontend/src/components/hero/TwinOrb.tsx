@@ -116,7 +116,7 @@ export function TwinOrb() {
   });
 
   return (
-    <mesh ref={meshRef} scale={1.15}>
+    <mesh ref={meshRef} scale={0.85}>
       <icosahedronGeometry args={[1, 64]} />
       <shaderMaterial
         ref={matRef}
@@ -124,7 +124,7 @@ export function TwinOrb() {
         fragmentShader={fragmentShader}
         uniforms={{
           uTime: { value: 0 },
-          uAmp: { value: 0.22 },
+          uAmp: { value: 0.12 },
           uColorDeep: { value: new THREE.Color("#7c3aed") },
           uColorRim: { value: new THREE.Color("#22d3ee") },
         }}
