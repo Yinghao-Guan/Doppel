@@ -1,0 +1,11 @@
+{
+  "name": "broncohacks",
+  "private": true,
+  "description": "Doppel — root passthrough scripts so you can run frontend commands from the repo root.",
+  "scripts": {
+    "dev": "pnpm --dir frontend dev",
+    "build": "pnpm --dir frontend build",
+    "start": "pnpm --dir frontend start",
+    "lint": "pnpm --dir frontend lint"
+  }
+}
