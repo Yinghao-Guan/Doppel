@@ -193,9 +193,10 @@ body {
   -webkit-text-fill-color: transparent;
   color: transparent;
   animation: doppel-shimmer 7s ease-in-out infinite;
-  will-change: background-position, transform, opacity, filter;
-  filter: drop-shadow(0 6px 30px color-mix(in srgb, var(--accent-deep) 50%, transparent))
-    drop-shadow(0 0 60px color-mix(in srgb, var(--accent-cyan) 30%, transparent));
+  will-change: background-position, transform, opacity;
+  text-shadow:
+    0 6px 30px color-mix(in srgb, var(--accent-deep) 50%, transparent),
+    0 0 60px color-mix(in srgb, var(--accent-cyan) 30%, transparent);
   /* Hidden until the GSAP intro reveals them. Prevents a FOUC where the
      letters paint at full opacity for one frame before JS hides them. */
   opacity: 0;
@@ -227,12 +228,21 @@ body {
   height: 14px;
   border-radius: 50%;
   cursor: pointer;
+  position: relative;
   transition:
     transform 200ms cubic-bezier(0.2, 0.7, 0.2, 1),
     box-shadow 200ms ease;
 }
 .accent-dot:hover {
   transform: scale(1.25);
+}
+/* Invisible hit-area overlay so the click target meets the WCAG minimum
+   without changing the visible 14px dot or the layout. inset: -5px expands
+   the clickable region to 24x24 (the Lighthouse target-size threshold). */
+.accent-dot::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
 }
 
 @keyframes doppel-shimmer {

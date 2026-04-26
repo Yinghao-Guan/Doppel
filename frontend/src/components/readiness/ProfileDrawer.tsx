@@ -123,6 +123,7 @@ export function ProfileDrawer({ open, onClose }: Props) {
               value={draft.Age}
               onChange={(e) => update("Age", Number(e.target.value))}
               className="input-base"
+              aria-label="Age in years"
             />
           </Field>
 
@@ -142,6 +143,7 @@ export function ProfileDrawer({ open, onClose }: Props) {
               value={draft.Height}
               onChange={(e) => update("Height", Number(e.target.value))}
               className="input-base"
+              aria-label="Height in centimeters"
             />
           </Field>
 
@@ -153,6 +155,7 @@ export function ProfileDrawer({ open, onClose }: Props) {
               value={draft.Weight}
               onChange={(e) => update("Weight", Number(e.target.value))}
               className="input-base"
+              aria-label="Weight in kilograms"
             />
           </Field>
 
@@ -171,6 +174,7 @@ export function ProfileDrawer({ open, onClose }: Props) {
                 update("Workout_Frequency", Number(e.target.value))
               }
               className="doppel-slider w-full"
+              aria-label="Workout frequency per week"
             />
             <div className="mt-1 flex justify-between font-mono text-[10px] tracking-[0.2em] text-[var(--fg-mute)]">
               <span>1</span>

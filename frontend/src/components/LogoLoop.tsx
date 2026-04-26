@@ -345,7 +345,7 @@ export const LogoLoop = React.memo<LogoLoopProps>(
     }, [effectiveHoverSpeed]);
 
     const renderLogoItem = useCallback(
-      (item: LogoItem, key: React.Key) => {
+      (item: LogoItem, key: React.Key, isClone: boolean = false) => {
         if (renderItem) {
           return (
             <li
@@ -423,6 +423,10 @@ export const LogoLoop = React.memo<LogoLoopProps>(
             aria-label={itemAriaLabel || "logo link"}
             target="_blank"
             rel="noreferrer noopener"
+            // Cloned copies of the marquee live inside an aria-hidden <ul> for
+            // screen readers — but their <a> elements are still in the tab order
+            // unless we explicitly remove them. Lighthouse flags this.
+            tabIndex={isClone ? -1 : undefined}
           >
             {content}
           </a>
@@ -460,7 +464,7 @@ export const LogoLoop = React.memo<LogoLoopProps>(
             ref={copyIndex === 0 ? seqRef : undefined}
           >
             {logos.map((item, itemIndex) =>
-              renderLogoItem(item, `${copyIndex}-${itemIndex}`),
+              renderLogoItem(item, `${copyIndex}-${itemIndex}`, copyIndex > 0),
             )}
           </ul>
         )),
