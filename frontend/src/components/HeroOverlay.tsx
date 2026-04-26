@@ -1,16 +1,23 @@
 "use client";
 
-import { Fragment, useEffect, useRef } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef } from "react";
 import gsap from "gsap";
 import { ArrowRight } from "lucide-react";
 import LogoLoop from "./LogoLoop";
+import { setLandingStep } from "@/lib/landing-step";
+
+// useLayoutEffect runs synchronously before browser paint, which is what we
+// need so the GSAP intro setup beats the first paint and avoids any FOUC.
+// useEffect on the server prevents the React SSR warning.
+const useIsoLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 const BUILT_WITH_LOGOS = [
   {
     src: "/logos/broncohackslogo.svg",
     alt: "BroncoHacks",
     title: "BroncoHacks",
-    href: "https://broncohacks.com",
+    href: "https://broncohacks.org/",
   },
   {
     src: "/logos/nextjslogo.svg",
@@ -41,6 +48,18 @@ export function HeroOverlay({ onStart }: { onStart?: () => void }) {
     if (isLeavingRef.current) return;
     isLeavingRef.current = true;
     if (!onStart) return;
+
+    // Kick the canvas FX transition off NOW (camera dolly, bloom fade,
+    // vignette fade, terrain dim — all 1.4s). If we wait until the hero
+    // fade-out completes, the bg stays at its bright landing state for the
+    // full 0.3s of the fade-out and only starts changing after the capture
+    // content has appeared, which reads as a "snap" from bright -> tinted.
+    // Triggering setLandingStep here lets the bg tween run in parallel with
+    // the hero fade-out so the bg is already mid-shift by the time capture
+    // content is visible. The setLandingStep("app") that LandingShell's
+    // [step] useEffect fires later is a no-op (dedup'd by setLandingStep).
+    setLandingStep("app");
+
     const main =
       typeof document !== "undefined" ? document.querySelector("main") : null;
     if (!main) {
@@ -49,14 +68,13 @@ export function HeroOverlay({ onStart }: { onStart?: () => void }) {
     }
     gsap.to(main, {
       opacity: 0,
-      filter: "blur(6px)",
-      duration: 0.35,
+      duration: 0.3,
       ease: "power2.in",
       onComplete: () => onStart(),
     });
   };
 
-  useEffect(() => {
+  useIsoLayoutEffect(() => {
     if (!rootRef.current) return;
 
     const ctx = gsap.context(() => {
@@ -76,9 +94,15 @@ export function HeroOverlay({ onStart }: { onStart?: () => void }) {
           opacity: 1,
           y: 0,
           scale: 1,
+          // Tween the blur away, then strip the inline filter so the CSS
+          // `drop-shadow(...)` glow on `.doppel-letter` becomes visible again.
+          // (Only `.doppel-letter` has a CSS filter we want to keep — the
+          // `.reveal` class's `filter: blur(6px)` is the *hidden* state, so
+          // clearProps would re-blur those elements.)
           filter: "blur(0px)",
           duration: 1.1,
           stagger: 0.07,
+          clearProps: "filter",
         })
           .to(
             ".reveal-tagline > span",
@@ -110,13 +134,13 @@ export function HeroOverlay({ onStart }: { onStart?: () => void }) {
 
         introHasPlayed = true;
       } else {
-        // Skip the reveal — jump elements straight to their final visible state.
-        gsap.set(".doppel-letter", {
-          opacity: 1,
-          y: 0,
-          scale: 1,
-          filter: "blur(0px)",
-        });
+        // Skip the reveal — jump elements straight to their final visible
+        // state. For `.doppel-letter`, leave `filter` alone so the CSS
+        // drop-shadow glow stays applied. For `.reveal*`, we MUST set
+        // `filter: blur(0px)` inline because the `.reveal` CSS class still
+        // applies `filter: blur(6px)` in its resting state — leaving it
+        // unset would render the elements blurry.
+        gsap.set(".doppel-letter", { opacity: 1, y: 0, scale: 1 });
         gsap.set(".reveal-tagline > span", {
           opacity: 1,
           y: 0,
@@ -126,21 +150,21 @@ export function HeroOverlay({ onStart }: { onStart?: () => void }) {
         gsap.set(".reveal-cta", { opacity: 1, y: 0, filter: "blur(0px)" });
       }
 
-      // Subtle perpetual float on each letter, symmetric around y=0
-      // so descenders don't swing into the tagline below.
+      // Subtle perpetual float on each letter. We start with a smooth settle
+      // from the intro's resting y=0 down to y=-4, *then* loop between
+      // y=-4 and y=4. This avoids the 4px snap that the old fromTo created
+      // the moment the intro finished.
       gsap.utils.toArray<HTMLElement>(".doppel-letter").forEach((el, i) => {
-        gsap.fromTo(
-          el,
-          { y: -4 },
-          {
-            y: 4,
-            duration: 2.4 + i * 0.18,
-            repeat: -1,
-            yoyo: true,
-            ease: "sine.inOut",
-            delay: introHasPlayed ? 0 : 1.2 + i * 0.05,
-          },
-        );
+        const tl = gsap.timeline({
+          delay: introHasPlayed ? 0 : 1.2 + i * 0.05,
+          defaults: { ease: "sine.inOut" },
+        });
+        tl.to(el, { y: -4, duration: 1.2 + i * 0.09 }).to(el, {
+          y: 4,
+          duration: 2.4 + i * 0.18,
+          repeat: -1,
+          yoyo: true,
+        });
       });
     }, rootRef);
 

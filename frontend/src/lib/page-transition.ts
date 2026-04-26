@@ -4,9 +4,11 @@ import { useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import gsap from "gsap";
 
-// Fades + blurs <main> before pushing the next route. Pairs with PageShell's
-// intro animation on the destination page so navigating between app pages
-// feels like a forward dolly through fog instead of a hard cut.
+// Fades <main> before pushing the next route. Pairs with PageShell's intro
+// animation on the destination page so navigating between app pages feels
+// like one continuous move instead of a hard cut. Avoids CSS `filter: blur`
+// because compositing it on top of the live WebGL canvas is what produced
+// the heavy/jittery feel.
 export function useTransitionNavigate() {
   const router = useRouter();
   const leavingRef = useRef(false);
@@ -33,8 +35,7 @@ export function useTransitionNavigate() {
 
       gsap.to(main, {
         opacity: 0,
-        filter: "blur(6px)",
-        duration: 0.35,
+        duration: 0.3,
         ease: "power2.in",
         onComplete: finish,
       });
