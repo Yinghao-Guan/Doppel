@@ -342,3 +342,5 @@ $RECYCLE.BIN/
 .idea/
 CLAUDE.md
 AGENTS.md
+
+solana/**/target/
