@@ -23,11 +23,13 @@
  */
 
 import type { RepEvent } from "@/types/fingerprint";
+import type { RealtimeState } from "@/lib/pose/analyzer";
 
 export type CuePriority = "low" | "medium" | "high";
 
 /** Stable identifier for each coaching trigger. Used for dedupe. */
 export type TriggerId =
+  // Rep-completion triggers (fired by pickCue on a counted rep)
   | "first-rep"
   | "low-form"
   | "asymmetry"
@@ -37,6 +39,14 @@ export type TriggerId =
   | "fatigue"
   | "milestone-half"
   | "milestone-strong"
+  // Real-time triggers (fired by pickRealtimeCue every frame)
+  | "shallow-rep"
+  | "standing-too-long"
+  | "slow-descent"
+  | "realtime-asymmetry"
+  | "knee-valgus"
+  | "forward-lean"
+  // Filler — fired when nothing else matches and silence is too long
   | "filler";
 
 export interface CueResult {
@@ -58,6 +68,10 @@ const SAME_TRIGGER_COOLDOWN_MS = 7000;
 /** When no specific trigger fires, drop a motivational filler if it's been
  *  this long since the last cue. Keeps the coach feeling alive. */
 const FILLER_INTERVAL_MS = 5000;
+/** Time in neutral phase (standing) during a capture before "let's go" fires. */
+const STANDING_TOO_LONG_MS = 5000;
+/** Per-frame asymmetry above this during active movement triggers a cue. */
+const REALTIME_ASYMMETRY_THRESHOLD = 0.10;
 
 const PRIORITY_RANK: Record<CuePriority, number> = {
   high: 3,
@@ -116,6 +130,37 @@ const VARIANTS: Record<Exclude<TriggerId, "filler">, readonly string[]> = {
     "That's strong work. Keep finding that depth.",
     "Big set, big effort. Keep stacking clean reps.",
     "Ten in the books. Don't slack on the rest.",
+  ],
+  // Real-time triggers — fired during a movement, not after a counted rep.
+  "shallow-rep": [
+    "Deeper! That was a quarter rep — drop below parallel.",
+    "Too shallow. Get those hips lower next one.",
+    "Need real depth. Don't cut it short.",
+  ],
+  "standing-too-long": [
+    "Let's go — drop into your next rep.",
+    "Don't rest too long, keep the intensity up.",
+    "Stay locked in. Reset and back into it.",
+  ],
+  "slow-descent": [
+    "Don't stall on the way down. Keep it moving.",
+    "Smooth descent, but don't pause halfway.",
+    "Control it, but keep the tempo flowing.",
+  ],
+  "realtime-asymmetry": [
+    "Even those knees — you're loading one side.",
+    "Square that stance, both legs driving.",
+    "Center your weight, stay balanced.",
+  ],
+  "knee-valgus": [
+    "Knees out! Track them over your toes.",
+    "Push those knees out — don't let them cave.",
+    "Watch the knees, keep them in line with your feet.",
+  ],
+  "forward-lean": [
+    "Chest up! Don't lean too far forward.",
+    "Stay tall — pull that chest back up.",
+    "Posture check — keep your torso upright.",
   ],
 };
 
@@ -271,4 +316,83 @@ export function pickCue(
   }
 
   return null;
+}
+
+/**
+ * Real-time cue picker. Runs every camera frame from PoseCamera's RAF loop.
+ * Operates on the per-frame RealtimeState (instead of completed reps) so it
+ * fires for events that DON'T produce a counted rep — shallow squats, knees
+ * caving in, forward lean, standing idle for too long, etc.
+ *
+ * Shares the same throttle/cooldown state in voice-store as `pickCue`, so a
+ * realtime cue and a rep-completion cue can never overlap.
+ *
+ * Returns null when the user is between sets (`!isCapturing`), when nothing
+ * meaningful is happening, or when throttle/cooldown blocks the candidate.
+ */
+export function pickRealtimeCue(
+  realtime: RealtimeState,
+  state: PickerState,
+  isCapturing: boolean,
+  now: number = performance.now(),
+): CueResult | null {
+  if (!isCapturing) return null;
+
+  const sinceLast = now - state.lastCueAt;
+  if (sinceLast < ANTI_OVERLAP_MS) return null;
+
+  type Candidate = {
+    triggerId: Exclude<TriggerId, "filler">;
+    priority: CuePriority;
+  };
+  const candidates: Candidate[] = [];
+
+  // Highest priority: visible form errors that need immediate correction.
+  if (realtime.shallowRepDetected) {
+    candidates.push({ triggerId: "shallow-rep", priority: "high" });
+  }
+  if (realtime.kneeValgusDetected) {
+    candidates.push({ triggerId: "knee-valgus", priority: "high" });
+  }
+  if (realtime.forwardLeanDetected) {
+    candidates.push({ triggerId: "forward-lean", priority: "high" });
+  }
+  if (
+    realtime.movementPhase !== "neutral" &&
+    realtime.currentAsymmetry > REALTIME_ASYMMETRY_THRESHOLD
+  ) {
+    candidates.push({ triggerId: "realtime-asymmetry", priority: "high" });
+  }
+
+  // Medium: pacing problems.
+  if (realtime.slowDescentDetected) {
+    candidates.push({ triggerId: "slow-descent", priority: "medium" });
+  }
+  if (
+    realtime.movementPhase === "neutral" &&
+    realtime.msInPhase > STANDING_TOO_LONG_MS
+  ) {
+    candidates.push({ triggerId: "standing-too-long", priority: "medium" });
+  }
+
+  if (candidates.length === 0) return null;
+
+  candidates.sort(
+    (a, b) => PRIORITY_RANK[b.priority] - PRIORITY_RANK[a.priority],
+  );
+  const top = candidates[0];
+
+  // Same-trigger cooldown (shared semantics with pickCue).
+  if (
+    top.triggerId === state.lastTriggerId &&
+    sinceLast < SAME_TRIGGER_COOLDOWN_MS
+  ) {
+    return null;
+  }
+
+  return {
+    text: variantFor(top.triggerId),
+    triggerId: top.triggerId,
+    priority: top.priority,
+  };
 }
