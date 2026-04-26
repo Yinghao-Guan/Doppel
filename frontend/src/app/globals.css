@@ -385,3 +385,26 @@ body {
   mix-blend-mode: screen;
   filter: blur(6px);
 }
+
+/* === splash screen wireframe sphere === */
+@keyframes splash-sphere-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.splash-sphere {
+  animation: splash-sphere-rotate 14s linear infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-sphere {
+    animation: none;
+  }
+}
