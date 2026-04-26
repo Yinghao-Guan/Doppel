@@ -14,6 +14,8 @@ Built for **BroncoHacks 2026**.
 
 ## How it works
 
+![UML Sequence Diagram](docs/img/uml_sequence.png)
+
 ```
 Camera → MediaPipe Pose → Training Fingerprint
                                   ↓
