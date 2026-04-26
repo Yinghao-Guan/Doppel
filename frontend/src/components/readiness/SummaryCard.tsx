@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
+import { SummaryAudioButton } from "@/components/twin/SummaryAudioButton";
 
 type Props = { summary: string };
 
@@ -39,11 +40,14 @@ export function SummaryCard({ summary }: Props) {
 
   return (
     <div ref={wrapRef} className="rd-fade glass-strong rounded-2xl p-7">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="eyebrow">Summary</p>
-        <span className="font-mono text-[10px] tracking-[0.3em] text-[var(--fg-mute)]">
-          DOPPEL · MODEL
-        </span>
+        <div className="flex items-center gap-3">
+          <SummaryAudioButton text={summary} />
+          <span className="font-mono text-[10px] tracking-[0.3em] text-[var(--fg-mute)]">
+            DOPPEL · MODEL
+          </span>
+        </div>
       </div>
       <p className="font-display text-xl leading-relaxed text-[var(--fg)] sm:text-2xl">
         {shown}

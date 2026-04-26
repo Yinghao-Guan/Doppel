@@ -6,7 +6,7 @@ import {
   PoseLandmarker,
   type PoseLandmarkerResult,
 } from "@mediapipe/tasks-vision";
-import { Camera, Square, Play } from "lucide-react";
+import { Camera, Square, Play, Volume2, VolumeX } from "lucide-react";
 import { SquatAnalyzer } from "@/lib/pose/analyzer";
 import type { Landmark } from "@/lib/pose/types";
 import { MOCK_FINGERPRINT } from "@/lib/pose/mockData";
@@ -16,6 +16,10 @@ import { clamp } from "@/lib/utils";
 import { drawSkeleton } from "./SkeletonOverlay";
 import { CameraError, type CameraErrorKind } from "./CameraError";
 import { FormPill } from "./FormPill";
+import { CoachCaption } from "./CoachCaption";
+import { useVoiceStore, readVoiceState } from "@/lib/voice-store";
+import * as voiceClient from "@/lib/voice-client";
+import { pickCue, COMMON_CUES, END_SET_LINE } from "@/lib/live-coach";
 
 const WASM_BASE =
   "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm";
@@ -117,6 +121,10 @@ export function PoseCamera() {
   const setFingerprint = useAthleteStore((s) => s.setFingerprint);
   const isDemo = isDemoMode();
 
+  const voicePlaying = useVoiceStore((s) => s.isPlaying);
+  const muted = useVoiceStore((s) => s.muted);
+  const toggleMuted = useVoiceStore((s) => s.toggleMuted);
+
   useEffect(() => {
     if (isDemo) {
       setReady(true);
@@ -214,7 +222,22 @@ export function PoseCamera() {
             if (count !== reps) {
               setReps(count);
               if (isCapturing) {
-                setFingerprint(analyzer.finish());
+                const fp = analyzer.finish();
+                setFingerprint(fp);
+                // Live coach: pick a cue based on the rep that just landed
+                // and (asynchronously) speak it. pickCue handles throttling
+                // and dedupe internally — no extra guard needed here.
+                const v = readVoiceState();
+                const cue = pickCue(fp.reps, {
+                  lastCueAt: v.lastCueAt,
+                  lastTriggerId: v.lastTriggerId,
+                });
+                if (cue) {
+                  useVoiceStore
+                    .getState()
+                    .recordCue(cue.triggerId, performance.now());
+                  void voiceClient.synthesizeAndPlay(cue.text);
+                }
               }
             }
 
@@ -240,10 +263,30 @@ export function PoseCamera() {
         clearInterval(demoIntervalRef.current);
         demoIntervalRef.current = null;
       }
+      // Stop any in-flight coach audio when leaving the page.
+      voiceClient.stop();
     };
   }, []);
 
+  // Keyboard shortcut: M toggles coach mute (only when not typing in a field).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "m" && e.key !== "M") return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      e.preventDefault();
+      toggleMuted();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggleMuted]);
+
   const start = () => {
+    // Reset cue history so a fresh set can speak from the first rep.
+    useVoiceStore.setState({ lastCueAt: 0, lastTriggerId: null });
+    // Pre-warm the audio cache so the first few cues play instantly.
+    voiceClient.prefetch(COMMON_CUES);
+
     if (isDemo) {
       if (demoIntervalRef.current) {
         clearInterval(demoIntervalRef.current);
@@ -258,15 +301,28 @@ export function PoseCamera() {
         fakeRep++;
         setReps(fakeRep);
         setLiveFormScore(MOCK_FINGERPRINT.reps[fakeRep - 1]?.formScore ?? null);
-        setFingerprint(
-          buildFingerprintFromReps(MOCK_FINGERPRINT.reps.slice(0, fakeRep)),
+        const partialFp = buildFingerprintFromReps(
+          MOCK_FINGERPRINT.reps.slice(0, fakeRep),
         );
+        setFingerprint(partialFp);
+        // Demo mode also speaks live cues so the recorded demo sounds real.
+        const v = readVoiceState();
+        const cue = pickCue(partialFp.reps, {
+          lastCueAt: v.lastCueAt,
+          lastTriggerId: v.lastTriggerId,
+        });
+        if (cue) {
+          useVoiceStore.getState().recordCue(cue.triggerId, performance.now());
+          void voiceClient.synthesizeAndPlay(cue.text);
+        }
         if (fakeRep >= DEMO_TARGET_REPS) {
           if (demoIntervalRef.current) {
             clearInterval(demoIntervalRef.current);
             demoIntervalRef.current = null;
           }
           setIsCapturing(false);
+          // Final flourish at the end of the demo set.
+          void voiceClient.synthesizeAndPlay(END_SET_LINE);
         }
       }, DEMO_REP_INTERVAL_MS);
       return;
@@ -284,6 +340,7 @@ export function PoseCamera() {
     const fp = analyzerRef.current.finish();
     setFingerprint(fp);
     setIsCapturing(false);
+    void voiceClient.synthesizeAndPlay(END_SET_LINE);
   };
 
   const retry = () => {
@@ -344,17 +401,47 @@ export function PoseCamera() {
             </span>
           )}
           <FormPill liveFormScore={liveFormScore} />
+          {voicePlaying && !muted && (
+            <span
+              className="rounded-full border px-2 py-0.5 font-mono text-[10px] tracking-[0.2em]"
+              style={{
+                borderColor: "var(--accent)",
+                background: "color-mix(in srgb, var(--accent) 15%, transparent)",
+                color: "var(--accent)",
+              }}
+            >
+              <Volume2
+                size={10}
+                strokeWidth={2}
+                className="mr-1 inline-block align-middle animate-pulse"
+              />
+              COACH
+            </span>
+          )}
         </div>
 
-        {/* Rep counter */}
-        <div className="glass absolute right-4 top-4 rounded-xl px-4 py-2 text-right">
-          <p className="font-mono text-[10px] tracking-[0.25em] text-[var(--fg-mute)]">
-            REPS
-          </p>
-          <p className="font-display text-3xl font-medium tabular-nums text-[var(--fg)]">
-            {reps}
-          </p>
+        {/* Rep counter + mute toggle */}
+        <div className="absolute right-4 top-4 flex items-start gap-2">
+          <button
+            type="button"
+            onClick={toggleMuted}
+            aria-label={muted ? "Unmute coach" : "Mute coach"}
+            title={muted ? "Unmute coach (M)" : "Mute coach (M)"}
+            className="glass flex h-9 w-9 items-center justify-center rounded-full text-[var(--fg-dim)] transition-colors hover:text-[var(--fg)]"
+          >
+            {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+          </button>
+          <div className="glass rounded-xl px-4 py-2 text-right">
+            <p className="font-mono text-[10px] tracking-[0.25em] text-[var(--fg-mute)]">
+              REPS
+            </p>
+            <p className="font-display text-3xl font-medium tabular-nums text-[var(--fg)]">
+              {reps}
+            </p>
+          </div>
         </div>
+
+        <CoachCaption />
 
         {error && <CameraError kind={error} onRetry={retry} />}
       </div>
