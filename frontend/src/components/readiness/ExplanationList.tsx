@@ -25,25 +25,23 @@ export function ExplanationList({ items }: Props) {
   }, [items]);
 
   return (
-    <div ref={rootRef} className="rd-fade glass rounded-2xl p-6">
-      <p className="eyebrow mb-4">Why</p>
-      <ul className="space-y-3">
+    <div ref={rootRef} className="rd-fade glass-strong rounded-2xl p-7">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="eyebrow">Why</p>
+        <span className="font-mono text-[10px] tracking-[0.3em] text-[var(--fg-mute)]">
+          DOPPEL · MODEL
+        </span>
+      </div>
+      <div className="space-y-3">
         {items.map((text, i) => (
-          <li
+          <p
             key={i}
-            className="expl-row relative pl-4 text-sm leading-relaxed text-[var(--fg-dim)]"
+            className="expl-row font-display text-xl leading-relaxed text-[var(--fg)] sm:text-2xl"
           >
-            <span
-              className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full"
-              style={{
-                background: "var(--accent)",
-                boxShadow: "0 0 8px var(--accent)",
-              }}
-            />
             {text}
-          </li>
+          </p>
         ))}
-      </ul>
+      </div>
     </div>
   );
 }

@@ -180,12 +180,7 @@ export function SimulatePanel({ baseline }: { baseline: PredictScores }) {
         />
         <p className="md:col-span-2 text-xs leading-relaxed text-[var(--fg-mute)]">
           Move the sliders &mdash; the same scoring chart from Now re-renders
-          with the projected outcome. Once the
-          <code className="mx-1 rounded bg-[var(--surface-2)] px-1 py-0.5 text-[10px] text-[var(--fg-dim)]">
-            /api/forecast
-          </code>
-          endpoint is wired, this swaps from heuristic deltas to the real
-          14-day forecast.
+          with the projected outcome.
         </p>
       </div>
     </div>
