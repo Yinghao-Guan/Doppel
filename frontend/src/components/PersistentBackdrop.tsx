@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Canvas } from "@react-three/fiber";
 import dynamic from "next/dynamic";
 import { TopoField } from "@/components/hero/TopoField";
+import { useLandingStep } from "@/lib/landing-step";
 
 const WireframeTwin = dynamic(
   () =>
@@ -25,7 +26,10 @@ const APP_DIM =
 
 export function PersistentBackdrop() {
   const pathname = usePathname();
-  const isLanding = pathname === "/";
+  const landingStep = useLandingStep();
+  // The mesh + landing FX should only show on the hero state of `/`,
+  // not while the inline capture wizard is visible.
+  const isLanding = pathname === "/" && landingStep === "hero";
 
   const [hidden, setHidden] = useState(false);
   useEffect(() => {

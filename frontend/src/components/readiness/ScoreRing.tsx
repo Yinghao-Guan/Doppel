@@ -80,8 +80,10 @@ export function ScoreRing({
       >
         <defs>
           <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor={tone} />
-            <stop offset="100%" stopColor={stop} />
+            {/* `stop-color` set via style (not attribute) so CSS variables
+                resolve and re-render reliably when the accent changes. */}
+            <stop offset="0%" style={{ stopColor: tone }} />
+            <stop offset="100%" style={{ stopColor: stop }} />
           </linearGradient>
         </defs>
         <circle

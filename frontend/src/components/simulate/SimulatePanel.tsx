@@ -1,13 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import gsap from "gsap";
-import { Activity, Flame, Loader2, Zap, Check } from "lucide-react";
-import { useProfile } from "@/lib/profile-store";
-import { useCaptureSignals } from "@/lib/capture-signals";
-import { predict } from "@/lib/predict";
-import type { PredictOutput, ProfileFields } from "@/types/predict";
-import { ProfileDrawer } from "@/components/readiness/ProfileDrawer";
+import { Activity, Flame, Zap, Check } from "lucide-react";
+import type { PredictScores } from "@/types/predict";
+import { ScoreQuadrant } from "@/components/readiness/ScoreQuadrant";
+
+type PlanDelta = {
+  strength: number;
+  endurance: number;
+  injury: number;
+};
 
 type PlanDef = {
   id: string;
@@ -15,7 +18,7 @@ type PlanDef = {
   blurb: string;
   icon: typeof Activity;
   tone: string;
-  workoutType: string;
+  delta: PlanDelta;
 };
 
 const PLANS: PlanDef[] = [
@@ -25,7 +28,7 @@ const PLANS: PlanDef[] = [
     blurb: "5x zone-2 + 1 long ride. Low joint load, slow strength gain.",
     icon: Activity,
     tone: "var(--accent-cyan)",
-    workoutType: "Cardio",
+    delta: { strength: 4, endurance: 12, injury: -6 },
   },
   {
     id: "B",
@@ -33,7 +36,7 @@ const PLANS: PlanDef[] = [
     blurb: "3x lift + 2x conditioning + 1 mobility. Balanced.",
     icon: Zap,
     tone: "var(--accent)",
-    workoutType: "Strength",
+    delta: { strength: 9, endurance: 7, injury: -2 },
   },
   {
     id: "C",
@@ -41,112 +44,47 @@ const PLANS: PlanDef[] = [
     blurb: "5x intervals + 1 lift. Fastest gains, highest risk.",
     icon: Flame,
     tone: "var(--danger)",
-    workoutType: "HIIT",
+    delta: { strength: 11, endurance: 9, injury: 11 },
   },
 ];
 
-type OutcomeMetric = { label: string; delta: number; unit: string };
-type PlanOutcomes = Record<string, OutcomeMetric[]>;
+const clamp = (v: number) => Math.max(0, Math.min(100, v));
 
-function buildOutcomes(
-  baseline: PredictOutput,
-  simulated: PredictOutput,
-): OutcomeMetric[] {
-  const d = (a: number, b: number) => Math.round(b - a);
-  return [
-    {
-      label: "Strength",
-      delta: d(
-        baseline.scores.strength_potential_score,
-        simulated.scores.strength_potential_score,
-      ),
-      unit: "%",
-    },
-    {
-      label: "Endurance",
-      delta: d(
-        baseline.scores.endurance_potential_score,
-        simulated.scores.endurance_potential_score,
-      ),
-      unit: "%",
-    },
-    {
-      label: "Recovery",
-      delta: d(
-        baseline.scores.readiness_score,
-        simulated.scores.readiness_score,
-      ),
-      unit: "%",
-    },
-    {
-      label: "Injury risk",
-      delta: d(
-        baseline.scores.injury_risk_score,
-        simulated.scores.injury_risk_score,
-      ),
-      unit: "%",
-    },
-  ];
+function simulate(
+  baseline: PredictScores,
+  plan: PlanDef,
+  frequency: number,
+  intensity: number,
+): PredictScores {
+  const mult = (frequency / 4) * (intensity / 60);
+  const dStr = plan.delta.strength * mult;
+  const dEnd = plan.delta.endurance * mult;
+  const dInj = plan.delta.injury * mult;
+  // Readiness moves with gains and against injury risk.
+  const dReady = (dStr + dEnd) / 2 - dInj / 2;
+  return {
+    strength_potential_score: clamp(baseline.strength_potential_score + dStr),
+    endurance_potential_score: clamp(baseline.endurance_potential_score + dEnd),
+    injury_risk_score: clamp(baseline.injury_risk_score + dInj),
+    readiness_score: clamp(baseline.readiness_score + dReady),
+  };
 }
 
-export function SimulatePanel() {
-  const { profile, isComplete, hydrated } = useProfile();
-  const cv = useCaptureSignals();
+export function SimulatePanel({ baseline }: { baseline: PredictScores }) {
   const [selected, setSelected] = useState<string>("B");
   const [frequency, setFrequency] = useState(4);
   const [intensity, setIntensity] = useState(60);
-  const [planOutcomes, setPlanOutcomes] = useState<PlanOutcomes | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const runSimulation = useCallback(() => {
-    if (!isComplete || !hydrated) return;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setLoading(true);
-      setError(null);
+  const plan = useMemo(
+    () => PLANS.find((p) => p.id === selected) ?? PLANS[1],
+    [selected],
+  );
 
-      const baseInput = { ...(profile as ProfileFields), ...cv };
-
-      // baseline: current profile unchanged
-      // each plan: swap workout type, apply slider-driven adjustments
-      const simInputs = PLANS.map((p) => ({
-        ...baseInput,
-        Workout_Type: p.workoutType,
-        Workout_Frequency: frequency,
-        fatigue_slope: Math.min(0.8, (intensity / 100) * 0.5),
-        Avg_BPM: Math.round(80 + intensity),
-        avg_form_score: Math.max(
-          0.3,
-          cv.avg_form_score - (intensity - 50) / 200,
-        ),
-      }));
-
-      Promise.all([predict(baseInput), ...simInputs.map(predict)])
-        .then(([baseline, ...sims]) => {
-          const outcomes: PlanOutcomes = {};
-          PLANS.forEach((p, i) => {
-            outcomes[p.id] = buildOutcomes(baseline, sims[i]);
-          });
-          setPlanOutcomes(outcomes);
-          setLoading(false);
-        })
-        .catch((err: unknown) => {
-          setError(err instanceof Error ? err.message : "Simulation failed.");
-          setLoading(false);
-        });
-    }, 400);
-  }, [isComplete, hydrated, profile, cv, frequency, intensity]);
-
-  useEffect(() => {
-    runSimulation();
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [runSimulation]);
+  const simulated = useMemo(
+    () => simulate(baseline, plan, frequency, intensity),
+    [baseline, plan, frequency, intensity],
+  );
 
   useEffect(() => {
     if (!rootRef.current) return;
@@ -163,39 +101,18 @@ export function SimulatePanel() {
     return () => ctx.revert();
   }, []);
 
-  if (!hydrated) return null;
-
-  if (!isComplete) {
-    return (
-      <div className="mt-10">
-        <div className="glass flex flex-col items-center gap-4 rounded-2xl p-12 text-center">
-          <p className="eyebrow">Awaiting profile</p>
-          <h2 className="font-display text-2xl text-[var(--fg)]">
-            Set your profile to run simulations.
-          </h2>
-          <p className="max-w-md text-sm text-[var(--fg-dim)]">
-            The what-if engine needs your baseline to compare against.
-          </p>
-          <button
-            onClick={() => setDrawerOpen(true)}
-            className="cta cta-primary mt-2"
-          >
-            Set profile
-          </button>
-        </div>
-        <ProfileDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
-      </div>
-    );
-  }
-
   return (
-    <div ref={rootRef} className="mt-10 space-y-8">
+    <div ref={rootRef} className="space-y-6">
+      <div className="sim-fade">
+        {/* Same component used by Now — just fed simulated scores. */}
+        <ScoreQuadrant key={`${plan.id}-${frequency}-${intensity}`} scores={simulated} />
+      </div>
+
       {/* plan cards */}
       <div className="grid gap-5 md:grid-cols-3">
         {PLANS.map((p) => {
           const active = selected === p.id;
           const Icon = p.icon;
-          const outcomes = planOutcomes?.[p.id];
           return (
             <button
               key={p.id}
@@ -233,43 +150,6 @@ export function SimulatePanel() {
               <p className="mt-2 text-sm leading-relaxed text-[var(--fg-dim)]">
                 {p.blurb}
               </p>
-
-              <div className="mt-5 space-y-2 min-h-[80px]">
-                {loading ? (
-                  <div className="flex items-center gap-2 text-xs text-[var(--fg-mute)]">
-                    <Loader2 size={12} className="animate-spin" strokeWidth={2} />
-                    <span className="font-mono tracking-widest">COMPUTING…</span>
-                  </div>
-                ) : error ? (
-                  <p className="text-xs text-[var(--danger)]">{error}</p>
-                ) : (outcomes ?? []).map((o) => {
-                    const positive =
-                      o.label === "Injury risk" ? o.delta < 0 : o.delta > 0;
-                    const neutral = o.delta === 0;
-                    return (
-                      <div
-                        key={o.label}
-                        className="flex items-center justify-between text-sm"
-                      >
-                        <span className="text-[var(--fg-mute)]">{o.label}</span>
-                        <span
-                          className="font-mono"
-                          style={{
-                            color: neutral
-                              ? "var(--fg-mute)"
-                              : positive
-                                ? "var(--success)"
-                                : "var(--danger)",
-                          }}
-                        >
-                          {o.delta > 0 ? "+" : ""}
-                          {o.delta}
-                          {o.unit}
-                        </span>
-                      </div>
-                    );
-                  })}
-              </div>
             </button>
           );
         })}
@@ -293,9 +173,16 @@ export function SimulatePanel() {
           unit="%"
           onChange={setIntensity}
         />
+        <p className="md:col-span-2 text-xs leading-relaxed text-[var(--fg-mute)]">
+          Move the sliders &mdash; the same scoring chart from Now re-renders
+          with the projected outcome. Once the
+          <code className="mx-1 rounded bg-[var(--surface-2)] px-1 py-0.5 text-[10px] text-[var(--fg-dim)]">
+            /api/forecast
+          </code>
+          endpoint is wired, this swaps from heuristic deltas to the real
+          14-day forecast.
+        </p>
       </div>
-
-      <ProfileDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </div>
   );
 }

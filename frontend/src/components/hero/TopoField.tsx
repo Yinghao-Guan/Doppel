@@ -134,6 +134,29 @@ export function TopoField({
     [],
   );
 
+  // Build the initial uniforms from the *current* accent so the very first
+  // frame already matches the user's saved preference — otherwise we'd flash
+  // the violet defaults before the effect below corrects them.
+  const initialUniforms = useMemo(
+    () => ({
+      uTime: { value: 0 },
+      uAmp: { value: 2.6 },
+      uScrollSpeed: { value: scrollSpeed },
+      uIntensity: { value: intensity },
+      uColorLow: {
+        value: new THREE.Color(accent.accentDeep).multiplyScalar(0.18),
+      },
+      uColorHigh: { value: new THREE.Color(accent.accentCyan) },
+      uFogColor: { value: new THREE.Color("#09090b") },
+      uFogNear: { value: 12 },
+      uFogFar: { value: 110 },
+    }),
+    // We only want this seed once at mount — accent changes are handled by the
+    // effect below, which mutates the live uniforms in place.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
   useFrame((state) => {
     if (throttleHalf) {
       skipRef.current = !skipRef.current;
@@ -184,17 +207,7 @@ export function TopoField({
         wireframe
         transparent
         depthWrite={false}
-        uniforms={{
-          uTime: { value: 0 },
-          uAmp: { value: 2.6 },
-          uScrollSpeed: { value: scrollSpeed },
-          uIntensity: { value: intensity },
-          uColorLow: { value: new THREE.Color("#1e1b4b") },
-          uColorHigh: { value: new THREE.Color("#0e7490") },
-          uFogColor: { value: new THREE.Color("#09090b") },
-          uFogNear: { value: 12 },
-          uFogFar: { value: 110 },
-        }}
+        uniforms={initialUniforms}
       />
     </mesh>
   );
