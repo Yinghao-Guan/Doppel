@@ -3,6 +3,21 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
+/**
+ * Pick the right Python binary for the current platform.
+ *
+ * - macOS / Linux convention: `python3`.
+ * - Windows convention: `python` (the default Python installer registers
+ *   `python.exe`, not `python3.exe`; calling `python3` on Windows hits the
+ *   Microsoft Store App Execution Alias stub and fails).
+ *
+ * Override via `PYTHON_BIN` env var when neither default works.
+ */
+function resolvePythonCmd(): string {
+  if (process.env.PYTHON_BIN) return process.env.PYTHON_BIN;
+  return process.platform === "win32" ? "python" : "python3";
+}
+
 function resolveModelScript(): { scriptPath: string; cwd: string } {
   const candidates = [
     {
@@ -38,7 +53,7 @@ export async function POST(request: Request) {
     const { scriptPath, cwd } = resolveModelScript();
 
     const result = await new Promise<string>((resolve, reject) => {
-      const child = spawn("python3", [scriptPath, "--stdin-json", "--json"], {
+      const child = spawn(resolvePythonCmd(), [scriptPath, "--stdin-json", "--json"], {
         cwd,
         stdio: ["pipe", "pipe", "pipe"],
       });
