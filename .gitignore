@@ -344,3 +344,6 @@ CLAUDE.md
 AGENTS.md
 
 solana/**/target/
+
+# Demo opening video build (fonts, generated PNGs, intermediate clips, output MP4)
+demo/
