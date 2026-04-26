@@ -168,7 +168,14 @@ export class SquatAnalyzer {
 
     // ── Realtime per-frame snapshot ────────────────────────────────────
     this.currentKneeAngle = kneeAngle;
-    this.currentAsymmetryFrame = Math.abs(lAngle - rAngle) / 180;
+    // Asymmetry is only meaningful when BOTH legs are visible — guard
+    // against `lAngle`/`rAngle` being `null` (one-sided frames from the
+    // bilateral fallback). When unavailable, snapshot 0 so the realtime
+    // asymmetry cue can't fire on a half-occluded frame.
+    this.currentAsymmetryFrame =
+      lAngle !== null && rAngle !== null
+        ? Math.abs(lAngle - rAngle) / 180
+        : 0;
 
     // Knee valgus: ratio of knee-spread to ankle-spread
     const kneeWidth = Math.abs(lKnee.x - rKnee.x);
