@@ -17,8 +17,52 @@ export function angleDeg(a: Landmark, b: Landmark, c: Landmark): number {
 }
 
 type Phase = "standing" | "descending" | "ascending";
+type MovementPhase = "neutral" | "descending" | "ascending";
+
+/**
+ * Snapshot of the live pose state, independent of whether a rep counted.
+ *
+ * Used by `pickRealtimeCue` to fire coaching cues mid-movement — even when
+ * the rep state machine doesn't increment because the user did a shallow
+ * squat that never crossed the bottom threshold.
+ *
+ * One-shot flags (`shallowRepDetected`, `slowDescentDetected`, etc.) stay
+ * true until the consumer calls `consumeFlags()`. Per-frame values
+ * (`currentKneeAngle`, `currentAsymmetry`, `movementPhase`, `msInPhase`)
+ * always reflect the latest frame.
+ */
+export interface RealtimeState {
+  movementPhase: MovementPhase;
+  msInPhase: number;
+  currentKneeAngle: number;
+  currentAsymmetry: number;
+  shallowRepDetected: boolean;
+  slowDescentDetected: boolean;
+  kneeValgusDetected: boolean;
+  forwardLeanDetected: boolean;
+}
+
+// ── Realtime tuning constants ────────────────────────────────────────────
+/** Knee angle below this counts as the start of a squat attempt. */
+const MOVEMENT_ATTEMPT_THRESHOLD_DEG = 145;
+/** Knee angle above this means the user is back to standing. */
+const MOVEMENT_STAND_HOLD_DEG = 165;
+/** movementMin must come within this of BOTTOM to count as deep enough.
+ *  Otherwise the rep is flagged shallow. */
+const SHALLOW_DEPTH_TOLERANCE_DEG = 8;
+/** How much the angle must rise past movementMin to count as "ascending". */
+const ASCEND_DETECT_DELTA_DEG = 8;
+/** Descent that takes longer than this fires the slow-descent flag once. */
+const SLOW_DESCENT_MS = 3500;
+/** kneeWidth/ankleWidth below this for several frames = knees collapsing. */
+const KNEE_VALGUS_RATIO = 0.85;
+const KNEE_VALGUS_FRAMES = 3;
+/** Hip-shoulder line angle from vertical (deg) above this = forward lean. */
+const FORWARD_LEAN_DEG = 30;
+const FORWARD_LEAN_FRAMES = 3;
 
 export class SquatAnalyzer {
+  // ── Rep state machine (committed reps) ───────────────────────────────
   private phase: Phase = "standing";
   private currentMin = 180;
   private currentMax = 180;
@@ -29,10 +73,33 @@ export class SquatAnalyzer {
   private asymSum = 0;
   private asymCount = 0;
 
+  // ── Realtime tracking (every frame, independent of rep state) ─────────
+  private movementPhase: MovementPhase = "neutral";
+  private movementMin = 180;
+  private movementStartMs = 0;
+  private neutralStartMs = 0;
+  private currentKneeAngle = 180;
+  private currentAsymmetryFrame = 0;
+  private valgusFrames = 0;
+  private leanFrames = 0;
+
+  // One-shot flags — set by ingest, cleared by consumeFlags()
+  private shallowRepFlag = false;
+  private slowDescentFlag = false;
+  private slowDescentEmittedThisDescent = false;
+  private kneeValgusFlag = false;
+  private forwardLeanFlag = false;
+
   constructor() {
-    this.lastTransitionMs = nowMs();
+    const t = nowMs();
+    this.lastTransitionMs = t;
+    this.neutralStartMs = t;
   }
 
+  /**
+   * Feed one frame of landmarks. Returns the current rep count.
+   * Visibility-gated: any leg landmark below MIN_VISIBILITY is skipped.
+   */
   ingest(landmarks: Landmark[]): number {
     if (landmarks.length < 33) return this.reps.length;
 
@@ -42,6 +109,8 @@ export class SquatAnalyzer {
     const rHip = landmarks[L.R_HIP];
     const rKnee = landmarks[L.R_KNEE];
     const rAnkle = landmarks[L.R_ANKLE];
+    const lShoulder = landmarks[L.L_SHOULDER];
+    const rShoulder = landmarks[L.R_SHOULDER];
 
     const required = [lHip, lKnee, lAnkle, rHip, rKnee, rAnkle];
     for (const lm of required) {
@@ -59,6 +128,95 @@ export class SquatAnalyzer {
     this.asymCount += 1;
 
     const now = nowMs();
+
+    // ── Realtime per-frame snapshot ────────────────────────────────────
+    this.currentKneeAngle = kneeAngle;
+    this.currentAsymmetryFrame = Math.abs(lAngle - rAngle) / 180;
+
+    // Knee valgus: ratio of knee-spread to ankle-spread
+    const kneeWidth = Math.abs(lKnee.x - rKnee.x);
+    const ankleWidth = Math.abs(lAnkle.x - rAnkle.x);
+    const valgusRatio = ankleWidth > 0.01 ? kneeWidth / ankleWidth : 1;
+
+    // Forward lean: angle of hip-shoulder line from vertical
+    let leanDeg = 0;
+    const shouldersOk =
+      lShoulder &&
+      rShoulder &&
+      (lShoulder.visibility ?? 1) >= SQUAT.MIN_VISIBILITY &&
+      (rShoulder.visibility ?? 1) >= SQUAT.MIN_VISIBILITY;
+    if (shouldersOk) {
+      const midShX = (lShoulder.x + rShoulder.x) / 2;
+      const midShY = (lShoulder.y + rShoulder.y) / 2;
+      const midHipX = (lHip.x + rHip.x) / 2;
+      const midHipY = (lHip.y + rHip.y) / 2;
+      const dx = Math.abs(midShX - midHipX);
+      const dy = Math.abs(midShY - midHipY);
+      leanDeg = (Math.atan2(dx, Math.max(dy, 0.001)) * 180) / Math.PI;
+    }
+
+    // ── Movement-phase state machine ──────────────────────────────────
+    // Independent of the rep state machine — fires even on shallow attempts.
+    if (this.movementPhase === "neutral") {
+      if (kneeAngle < MOVEMENT_ATTEMPT_THRESHOLD_DEG) {
+        this.movementPhase = "descending";
+        this.movementMin = kneeAngle;
+        this.movementStartMs = now;
+        this.slowDescentEmittedThisDescent = false;
+        this.valgusFrames = 0;
+        this.leanFrames = 0;
+      }
+    } else if (this.movementPhase === "descending") {
+      this.movementMin = Math.min(this.movementMin, kneeAngle);
+      if (kneeAngle > this.movementMin + ASCEND_DETECT_DELTA_DEG) {
+        // Started ascending. Was it deep enough?
+        this.movementPhase = "ascending";
+        if (
+          this.movementMin >
+          SQUAT.BOTTOM_ANGLE_DEG + SHALLOW_DEPTH_TOLERANCE_DEG
+        ) {
+          this.shallowRepFlag = true;
+        }
+      } else if (
+        !this.slowDescentEmittedThisDescent &&
+        now - this.movementStartMs > SLOW_DESCENT_MS
+      ) {
+        this.slowDescentFlag = true;
+        this.slowDescentEmittedThisDescent = true;
+      }
+    } else if (this.movementPhase === "ascending") {
+      if (kneeAngle > MOVEMENT_STAND_HOLD_DEG) {
+        this.movementPhase = "neutral";
+        this.movementMin = 180;
+        this.neutralStartMs = now;
+      }
+    }
+
+    const inActiveMovement = this.movementPhase !== "neutral";
+
+    // Knee valgus accumulates only during active movement.
+    if (inActiveMovement && valgusRatio < KNEE_VALGUS_RATIO) {
+      this.valgusFrames += 1;
+      if (this.valgusFrames >= KNEE_VALGUS_FRAMES) {
+        this.kneeValgusFlag = true;
+        this.valgusFrames = 0;
+      }
+    } else {
+      this.valgusFrames = 0;
+    }
+
+    // Forward lean accumulates only during active movement.
+    if (inActiveMovement && leanDeg > FORWARD_LEAN_DEG) {
+      this.leanFrames += 1;
+      if (this.leanFrames >= FORWARD_LEAN_FRAMES) {
+        this.forwardLeanFlag = true;
+        this.leanFrames = 0;
+      }
+    } else {
+      this.leanFrames = 0;
+    }
+
+    // ── Rep state machine (UNCHANGED — committed reps only) ───────────
     const isBelow = kneeAngle < SQUAT.BOTTOM_ANGLE_DEG;
     const isAbove = kneeAngle > SQUAT.STAND_ANGLE_DEG;
 
@@ -122,9 +280,43 @@ export class SquatAnalyzer {
     return this.reps.length;
   }
 
+  /** Last completed rep's form score, or null if none yet. Used by FormPill. */
   getLastFormScore(): number | null {
     if (this.reps.length === 0) return null;
     return this.reps[this.reps.length - 1].formScore;
+  }
+
+  /**
+   * Snapshot current realtime pose state. Cheap (no allocation beyond the
+   * returned object) — safe to call every frame.
+   */
+  getRealtimeState(now: number = nowMs()): RealtimeState {
+    const msInPhase =
+      this.movementPhase === "neutral"
+        ? now - this.neutralStartMs
+        : now - this.movementStartMs;
+    return {
+      movementPhase: this.movementPhase,
+      msInPhase,
+      currentKneeAngle: this.currentKneeAngle,
+      currentAsymmetry: this.currentAsymmetryFrame,
+      shallowRepDetected: this.shallowRepFlag,
+      slowDescentDetected: this.slowDescentFlag,
+      kneeValgusDetected: this.kneeValgusFlag,
+      forwardLeanDetected: this.forwardLeanFlag,
+    };
+  }
+
+  /**
+   * Clear all one-shot realtime flags. Call after consuming a flag (e.g.
+   * after firing the corresponding voice cue) so the same condition has to
+   * be re-detected before firing again.
+   */
+  consumeFlags(): void {
+    this.shallowRepFlag = false;
+    this.slowDescentFlag = false;
+    this.kneeValgusFlag = false;
+    this.forwardLeanFlag = false;
   }
 
   finish(): TrainingFingerprint {
@@ -185,15 +377,30 @@ export class SquatAnalyzer {
   }
 
   reset(): void {
+    const t = nowMs();
     this.phase = "standing";
     this.currentMin = 180;
     this.currentMax = 180;
-    this.lastTransitionMs = nowMs();
+    this.lastTransitionMs = t;
     this.reps = [];
     this.framesBelow = 0;
     this.framesAbove = 0;
     this.asymSum = 0;
     this.asymCount = 0;
+
+    this.movementPhase = "neutral";
+    this.movementMin = 180;
+    this.movementStartMs = 0;
+    this.neutralStartMs = t;
+    this.currentKneeAngle = 180;
+    this.currentAsymmetryFrame = 0;
+    this.valgusFrames = 0;
+    this.leanFrames = 0;
+    this.shallowRepFlag = false;
+    this.slowDescentFlag = false;
+    this.slowDescentEmittedThisDescent = false;
+    this.kneeValgusFlag = false;
+    this.forwardLeanFlag = false;
   }
 }
 
