@@ -36,7 +36,8 @@ export type TriggerId =
   | "great-form"
   | "fatigue"
   | "milestone-half"
-  | "milestone-strong";
+  | "milestone-strong"
+  | "filler";
 
 export interface CueResult {
   text: string;
@@ -51,6 +52,12 @@ interface PickerState {
 
 const ANTI_OVERLAP_MS = 2500;
 const LOW_PRIORITY_THROTTLE_MS = 5500;
+/** A specific trigger may re-fire after this cooldown — keeps coaching active
+ *  when the athlete has a persistent issue (e.g. shallow squat for 5 reps in a row). */
+const SAME_TRIGGER_COOLDOWN_MS = 7000;
+/** When no specific trigger fires, drop a motivational filler if it's been
+ *  this long since the last cue. Keeps the coach feeling alive. */
+const FILLER_INTERVAL_MS = 5000;
 
 const PRIORITY_RANK: Record<CuePriority, number> = {
   high: 3,
@@ -64,7 +71,7 @@ const PRIORITY_RANK: Record<CuePriority, number> = {
  *
  * Keep each variant ≤ ~12 words so the audio finishes in under ~3s.
  */
-const VARIANTS: Record<TriggerId, readonly string[]> = {
+const VARIANTS: Record<Exclude<TriggerId, "filler">, readonly string[]> = {
   "first-rep": [
     "Here we go. Set the pace, own that first rep.",
     "Locked in. Make this first one count.",
@@ -116,17 +123,39 @@ const VARIANTS: Record<TriggerId, readonly string[]> = {
 export const END_SET_LINE =
   "Set complete. That was a strong effort — clean reps all the way.";
 
+/**
+ * Short motivational fillers fired when no specific issue/milestone matches
+ * but it's been quiet for too long. Real PTs say something between every rep,
+ * not just on detected issues — these keep the coach feeling active.
+ */
+const FILLERS: readonly string[] = [
+  "Nice rep.",
+  "Stay tight.",
+  "Eyes forward, breathe through it.",
+  "Drive through your heels.",
+  "Keep that core engaged.",
+  "Find your rhythm.",
+  "You got this.",
+  "Smooth and controlled.",
+];
+
 /** Every line the engine can ever speak — used by voice-client.prefetch. */
 export const COMMON_CUES: readonly string[] = [
   ...Object.values(VARIANTS).flat(),
+  ...FILLERS,
   END_SET_LINE,
 ];
 
 /** Pick a random variant for a trigger. */
-function variantFor(trigger: TriggerId): string {
+function variantFor(trigger: Exclude<TriggerId, "filler">): string {
   const list = VARIANTS[trigger];
   const idx = Math.floor(Math.random() * list.length);
   return list[idx];
+}
+
+/** Pick a random filler. */
+function pickFiller(): string {
+  return FILLERS[Math.floor(Math.random() * FILLERS.length)];
 }
 
 /** Linear regression slope of y vs x. Used to detect form fatigue. */
@@ -155,14 +184,20 @@ export function pickCue(
 ): CueResult | null {
   if (reps.length === 0) return null;
   const latest = reps[reps.length - 1];
+  const sinceLast = now - state.lastCueAt;
 
-  const candidates: { triggerId: TriggerId; priority: CuePriority }[] = [];
+  // Anti-overlap: never speak over the previous line. Applies to ALL cues
+  // including fillers.
+  if (sinceLast < ANTI_OVERLAP_MS) return null;
 
-  // Form quality
-  if (latest.formScore < 0.55) {
+  type Candidate = { triggerId: Exclude<TriggerId, "filler">; priority: CuePriority };
+  const candidates: Candidate[] = [];
+
+  // Form quality (slightly more sensitive than v1 so cues fire reliably)
+  if (latest.formScore < 0.65) {
     candidates.push({ triggerId: "low-form", priority: "high" });
   }
-  if (latest.asymmetryPct > 0.10) {
+  if (latest.asymmetryPct > 0.08) {
     candidates.push({ triggerId: "asymmetry", priority: "high" });
   }
 
@@ -198,31 +233,42 @@ export function pickCue(
     candidates.push({ triggerId: "milestone-strong", priority: "low" });
   }
 
-  if (candidates.length === 0) return null;
+  // Try the highest-priority real trigger first.
+  if (candidates.length > 0) {
+    candidates.sort(
+      (a, b) => PRIORITY_RANK[b.priority] - PRIORITY_RANK[a.priority],
+    );
+    const top = candidates[0];
 
-  // Highest priority wins. Within same priority, first declared wins.
-  candidates.sort(
-    (a, b) => PRIORITY_RANK[b.priority] - PRIORITY_RANK[a.priority],
-  );
-  const top = candidates[0];
+    const lowPriorityBlocked =
+      top.priority === "low" && sinceLast < LOW_PRIORITY_THROTTLE_MS;
 
-  const sinceLast = now - state.lastCueAt;
+    // Same-trigger cooldown (NOT strict no-repeat): the same issue can re-fire
+    // after a few seconds, picking a different variant text so it doesn't sound
+    // robotic. This keeps coaching active when the athlete has a persistent
+    // problem like consistently shallow squats.
+    const sameTriggerBlocked =
+      top.triggerId === state.lastTriggerId &&
+      sinceLast < SAME_TRIGGER_COOLDOWN_MS;
 
-  // Anti-overlap: never speak over the previous line.
-  if (sinceLast < ANTI_OVERLAP_MS) return null;
-
-  // Soft-throttle: low-priority cues suppressed for an extra window.
-  if (top.priority === "low" && sinceLast < LOW_PRIORITY_THROTTLE_MS) {
-    return null;
+    if (!lowPriorityBlocked && !sameTriggerBlocked) {
+      return {
+        text: variantFor(top.triggerId),
+        triggerId: top.triggerId,
+        priority: top.priority,
+      };
+    }
   }
 
-  // Anti-repeat: never fire the same trigger twice in a row, regardless of
-  // which variant text would have come out. This keeps coaching feel fresh.
-  if (top.triggerId === state.lastTriggerId) return null;
+  // No specific trigger fits — drop in a motivational filler so the coach
+  // doesn't go silent for long stretches.
+  if (sinceLast >= FILLER_INTERVAL_MS) {
+    return {
+      text: pickFiller(),
+      triggerId: "filler",
+      priority: "low",
+    };
+  }
 
-  return {
-    text: variantFor(top.triggerId),
-    triggerId: top.triggerId,
-    priority: top.priority,
-  };
+  return null;
 }

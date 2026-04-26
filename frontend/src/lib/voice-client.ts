@@ -125,12 +125,22 @@ export async function synthesizeAndPlay(
 
 /**
  * Pre-warm the cache for an array of cues. Fire-and-forget; failures are
- * logged but don't reject. Use this on Start Set so the first few live
- * cues during a set play instantly.
+ * logged but don't reject.
+ *
+ * IMPORTANT: ElevenLabs rate-limits concurrent requests (the free tier caps
+ * at 2). Firing 25+ requests in parallel makes most of them 429 and they
+ * never reach the cache. We process in small batches so the prefetch
+ * completes reliably in the background while the user is still doing reps.
  */
-export function prefetch(texts: readonly string[], voiceId?: string): void {
-  for (const t of texts) {
-    void synthesize(t, voiceId);
+const PREFETCH_CONCURRENCY = 3;
+
+export async function prefetch(
+  texts: readonly string[],
+  voiceId?: string,
+): Promise<void> {
+  for (let i = 0; i < texts.length; i += PREFETCH_CONCURRENCY) {
+    const chunk = texts.slice(i, i + PREFETCH_CONCURRENCY);
+    await Promise.all(chunk.map((t) => synthesize(t, voiceId)));
   }
 }
 
