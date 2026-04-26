@@ -13,6 +13,8 @@ import { SignalRadar } from "./SignalRadar";
 import { SummaryCard } from "./SummaryCard";
 import { ExplanationList } from "./ExplanationList";
 import { RecommendationCards } from "./RecommendationCards";
+import { TwinTabs, type TwinMode } from "@/components/twin/TwinTabs";
+import { SimulatePanel } from "@/components/simulate/SimulatePanel";
 
 export function ReadinessView() {
   const { profile, isComplete, hydrated } = useProfile();
@@ -20,6 +22,7 @@ export function ReadinessView() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [result, setResult] = useState<PredictOutput | null>(null);
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<TwinMode>("now");
   const rootRef = useRef<HTMLDivElement>(null);
   const openedOnce = useRef(false);
 
@@ -63,7 +66,7 @@ export function ReadinessView() {
       });
     }, rootRef);
     return () => ctx.revert();
-  }, [result]);
+  }, [result, mode]);
 
   return (
     <div ref={rootRef} className="mt-8">
@@ -91,13 +94,19 @@ export function ReadinessView() {
         </button>
       </div>
 
+      {isComplete && result && (
+        <div className="mb-6 flex justify-center">
+          <TwinTabs mode={mode} onChange={setMode} />
+        </div>
+      )}
+
       {!isComplete && hydrated && (
         <EmptyState onOpen={() => setDrawerOpen(true)} />
       )}
 
       {isComplete && (loading || !result) && <LoadingState />}
 
-      {isComplete && result && (
+      {isComplete && result && mode === "now" && (
         <div className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
             <ScoreQuadrant scores={result.scores} />
@@ -113,6 +122,10 @@ export function ReadinessView() {
             </div>
           </div>
         </div>
+      )}
+
+      {isComplete && result && mode === "whatif" && (
+        <SimulatePanel baseline={result.scores} />
       )}
 
       <ProfileDrawer

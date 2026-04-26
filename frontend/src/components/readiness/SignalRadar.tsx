@@ -106,15 +106,15 @@ export function SignalRadar({ signals }: Props) {
         >
           <defs>
             <radialGradient id={gradId} cx="50%" cy="50%" r="50%">
+              {/* `stop-color` set via style so CSS variables resolve and
+                  update when the accent preset changes. */}
               <stop
                 offset="0%"
-                stopColor="var(--accent-cyan)"
-                stopOpacity="0.65"
+                style={{ stopColor: "var(--accent-cyan)", stopOpacity: 0.65 }}
               />
               <stop
                 offset="100%"
-                stopColor="var(--accent)"
-                stopOpacity="0.25"
+                style={{ stopColor: "var(--accent)", stopOpacity: 0.25 }}
               />
             </radialGradient>
           </defs>
@@ -140,11 +140,16 @@ export function SignalRadar({ signals }: Props) {
               y1={CENTER}
               x2={p.x}
               y2={p.y}
-              stroke={
-                hoverIdx === i ? "var(--accent-cyan)" : "rgba(255,255,255,0.08)"
-              }
               strokeWidth={1}
-              style={{ transition: "stroke 180ms ease" }}
+              // Stroke set via style so the CSS var resolves to the current
+              // accent and live-updates when it changes.
+              style={{
+                stroke:
+                  hoverIdx === i
+                    ? "var(--accent-cyan)"
+                    : "rgba(255,255,255,0.08)",
+                transition: "stroke 180ms ease",
+              }}
             />
           ))}
 
@@ -153,10 +158,10 @@ export function SignalRadar({ signals }: Props) {
             ref={polyRef}
             points={`${CENTER},${CENTER}`}
             fill={`url(#${gradId})`}
-            stroke="var(--accent-cyan)"
             strokeWidth={1.4}
             strokeLinejoin="round"
             style={{
+              stroke: "var(--accent-cyan)",
               filter:
                 "drop-shadow(0 0 14px color-mix(in srgb, var(--accent-cyan) 60%, transparent))",
             }}
@@ -169,8 +174,8 @@ export function SignalRadar({ signals }: Props) {
               cx={p.x}
               cy={p.y}
               r={hoverIdx === i ? 5 : 3}
-              fill="var(--accent-cyan)"
               style={{
+                fill: "var(--accent-cyan)",
                 filter:
                   "drop-shadow(0 0 6px color-mix(in srgb, var(--accent-cyan) 80%, transparent))",
                 transition: "r 180ms ease",
@@ -197,10 +202,10 @@ export function SignalRadar({ signals }: Props) {
                   fontFamily="var(--font-mono), ui-monospace, monospace"
                   fontSize="10"
                   letterSpacing="0.22em"
-                  fill={
-                    hoverIdx === i ? "var(--fg)" : "var(--fg-dim)"
-                  }
-                  style={{ transition: "fill 180ms ease" }}
+                  style={{
+                    fill: hoverIdx === i ? "var(--fg)" : "var(--fg-dim)",
+                    transition: "fill 180ms ease",
+                  }}
                 >
                   {sig.label}
                 </text>
@@ -212,7 +217,7 @@ export function SignalRadar({ signals }: Props) {
                     dominantBaseline="middle"
                     fontFamily="var(--font-display), system-ui, sans-serif"
                     fontSize="11"
-                    fill="var(--accent-cyan)"
+                    style={{ fill: "var(--accent-cyan)" }}
                   >
                     {value.toFixed(1)}
                   </text>

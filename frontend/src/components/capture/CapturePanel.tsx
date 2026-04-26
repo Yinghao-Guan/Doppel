@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Camera, Circle, Square, Activity } from "lucide-react";
+import { Camera, Circle, Square, Activity, ArrowRight } from "lucide-react";
 import gsap from "gsap";
 
 const SIGNALS = [
@@ -13,7 +13,7 @@ const SIGNALS = [
   { label: "ASYMMETRY", value: "—", unit: "%", tone: "var(--danger)" },
 ];
 
-export function CapturePanel() {
+export function CapturePanel({ onFinish }: { onFinish?: () => void } = {}) {
   const [recording, setRecording] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -123,6 +123,16 @@ export function CapturePanel() {
           </code>
           stream.
         </p>
+        {onFinish && (
+          <button
+            type="button"
+            onClick={onFinish}
+            className="cta cta-primary mt-6 w-full justify-center"
+          >
+            See your twin
+            <ArrowRight size={14} strokeWidth={2.2} />
+          </button>
+        )}
       </div>
     </div>
   );

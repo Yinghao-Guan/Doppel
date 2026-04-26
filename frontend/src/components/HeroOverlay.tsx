@@ -1,10 +1,8 @@
 "use client";
 
 import { Fragment, useEffect, useRef } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import gsap from "gsap";
-import { ArrowRight, Play } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import LogoLoop from "./LogoLoop";
 
 const BUILT_WITH_LOGOS = [
@@ -34,18 +32,19 @@ const WORDMARK = ["d", "o", "p", "p", "e", "l"];
 // so the intro animation only plays once per real page load.
 let introHasPlayed = false;
 
-export function HeroOverlay() {
+export function HeroOverlay({ onStart }: { onStart?: () => void }) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
   const isLeavingRef = useRef(false);
 
-  const transitionTo = (href: string) => (e: React.MouseEvent) => {
-    if (isLeavingRef.current) return;
+  const handleStart = (e: React.MouseEvent) => {
     e.preventDefault();
+    if (isLeavingRef.current) return;
     isLeavingRef.current = true;
-    const main = document.querySelector("main");
+    if (!onStart) return;
+    const main =
+      typeof document !== "undefined" ? document.querySelector("main") : null;
     if (!main) {
-      router.push(href);
+      onStart();
       return;
     }
     gsap.to(main, {
@@ -53,7 +52,7 @@ export function HeroOverlay() {
       filter: "blur(6px)",
       duration: 0.35,
       ease: "power2.in",
-      onComplete: () => router.push(href),
+      onComplete: () => onStart(),
     });
   };
 
@@ -186,22 +185,14 @@ export function HeroOverlay() {
         </p>
 
         <div className="mt-7 flex flex-col items-center gap-3 sm:flex-row sm:gap-4 md:items-start md:justify-start">
-          <Link
-            href="/capture"
-            onClick={transitionTo("/capture")}
+          <button
+            type="button"
+            onClick={handleStart}
             className="cta cta-primary reveal-cta reveal"
           >
             Start your twin
             <ArrowRight size={16} strokeWidth={2.2} />
-          </Link>
-          <Link
-            href="/dashboard"
-            onClick={transitionTo("/dashboard")}
-            className="cta glass cta-ghost reveal-cta reveal"
-          >
-            <Play size={14} strokeWidth={2.2} />
-            See the demo
-          </Link>
+          </button>
         </div>
 
         <div
