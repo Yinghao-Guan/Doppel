@@ -51,7 +51,6 @@ export async function POST(req: Request) {
       ],
       GENERATE_PLAN_SCHEMA,
       0.8,
-      { model: "gemini-2.5-flash-lite" },
     );
 
     if (!result?.plans || !Array.isArray(result.plans)) {
