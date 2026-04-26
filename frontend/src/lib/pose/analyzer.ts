@@ -18,6 +18,17 @@ export function angleDeg(a: Landmark, b: Landmark, c: Landmark): number {
 
 type Phase = "standing" | "descending" | "ascending";
 
+/** Window size for the median filter on knee angle. 3 frames is enough to
+ *  reject a single noisy outlier without adding meaningful latency
+ *  (1 frame lag at 30fps ≈ 33ms). */
+const SMOOTHING_WINDOW = 3;
+
+/** Median of an array (returns middle of sorted copy; mutates a copy, not src). */
+function median(values: readonly number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)];
+}
+
 export class SquatAnalyzer {
   private phase: Phase = "standing";
   private currentMin = 180;
@@ -28,6 +39,18 @@ export class SquatAnalyzer {
   private framesAbove = 0;
   private asymSum = 0;
   private asymCount = 0;
+
+  /**
+   * Last few raw knee-angle samples. We feed the MEDIAN of this window into
+   * the state-machine threshold checks so a single noisy frame can't bounce
+   * `framesAbove` / `framesBelow` back to zero. Without this, MediaPipe's
+   * landmark jitter at the threshold edges (~±2-5°) caused good reps to be
+   * silently dropped.
+   *
+   * Raw kneeAngle (not smoothed) is still used for currentMin/currentMax so
+   * the depth measurement / form score reflects the actual deepest point.
+   */
+  private recentAngles: number[] = [];
 
   constructor() {
     this.lastTransitionMs = nowMs();
@@ -53,14 +76,25 @@ export class SquatAnalyzer {
     const rAngle = angleDeg(rHip, rKnee, rAnkle);
     const kneeAngle = (lAngle + rAngle) / 2;
 
+    // Update raw stats (depth + asymmetry) BEFORE smoothing — we want the
+    // actual deepest point in the rep, not a smoothed approximation.
     this.currentMin = Math.min(this.currentMin, kneeAngle);
     this.currentMax = Math.max(this.currentMax, kneeAngle);
     this.asymSum += Math.abs(lAngle - rAngle) / 180;
     this.asymCount += 1;
 
+    // Median-filtered angle drives the state machine. While the buffer is
+    // warming up (first 1-2 frames after reset) we fall back to raw kneeAngle.
+    this.recentAngles.push(kneeAngle);
+    if (this.recentAngles.length > SMOOTHING_WINDOW) this.recentAngles.shift();
+    const smoothedAngle =
+      this.recentAngles.length === SMOOTHING_WINDOW
+        ? median(this.recentAngles)
+        : kneeAngle;
+
     const now = nowMs();
-    const isBelow = kneeAngle < SQUAT.BOTTOM_ANGLE_DEG;
-    const isAbove = kneeAngle > SQUAT.STAND_ANGLE_DEG;
+    const isBelow = smoothedAngle < SQUAT.BOTTOM_ANGLE_DEG;
+    const isAbove = smoothedAngle > SQUAT.STAND_ANGLE_DEG;
 
     if (isBelow) {
       this.framesBelow += 1;
@@ -194,6 +228,7 @@ export class SquatAnalyzer {
     this.framesAbove = 0;
     this.asymSum = 0;
     this.asymCount = 0;
+    this.recentAngles = [];
   }
 }
 
