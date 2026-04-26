@@ -62,7 +62,7 @@ const SCORE_DEFS = [
   { key: "injury_risk_score" as const,        label: "INJURY RISK",tone: "var(--danger)" },
 ];
 
-export function CapturePanel(_props: { onFinish?: () => void } = {}) {
+export function CapturePanel({ onFinish }: { onFinish?: () => void }) {
   const fingerprint = useAthleteStore((s) => s.fingerprint);
   const { profile, isComplete } = useProfile();
   const cv = useCaptureSignals();
@@ -238,6 +238,18 @@ export function CapturePanel(_props: { onFinish?: () => void } = {}) {
                           {r}
                         </span>
                       ))}
+                    </div>
+                  )}
+
+                  {onFinish && (
+                    <div className="mt-4">
+                      <button
+                        type="button"
+                        onClick={onFinish}
+                        className="cta cta-primary"
+                      >
+                        Continue to twin
+                      </button>
                     </div>
                   )}
                 </>

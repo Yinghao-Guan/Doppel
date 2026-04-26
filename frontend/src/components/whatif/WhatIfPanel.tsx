@@ -57,6 +57,39 @@ const BASELINE_PLAN: PlanCandidate = {
   rationale: "Baseline progressive squat-focused plan honoring current fatigue.",
 };
 
+const STARTER_PLANS: PlanCandidate[] = [
+  {
+    plan_name: "Strength ramp 4x/wk",
+    philosophy: "Progressive Overload",
+    sessions_per_week: 4,
+    intensity: "moderate-high",
+    exercise_mix: { strength: 0.65, cardio: 0.15, mobility: 0.2 },
+    weekly_schedule: [],
+    rationale:
+      "Preview card: one extra strength day while preserving mobility work and recovery spacing.",
+  },
+  {
+    plan_name: "Hybrid engine split",
+    philosophy: "Balanced Hybrid",
+    sessions_per_week: 5,
+    intensity: "moderate",
+    exercise_mix: { strength: 0.4, cardio: 0.4, mobility: 0.2 },
+    weekly_schedule: [],
+    rationale:
+      "Preview card: balances lifting and conditioning when you want fitness gains without aggressive loading.",
+  },
+  {
+    plan_name: "Recovery-first rebuild",
+    philosophy: "Controlled Intensity",
+    sessions_per_week: 3,
+    intensity: "low",
+    exercise_mix: { strength: 0.35, cardio: 0.2, mobility: 0.45 },
+    weekly_schedule: [],
+    rationale:
+      "Preview card: lower intensity with extra mobility when fatigue or asymmetry is becoming the limiter.",
+  },
+];
+
 const BASELINE_FORECAST: ModelForecast = {
   scores: {
     readiness_score: 72.0,
@@ -274,6 +307,8 @@ export function WhatIfPanel() {
     () => modelAfterForecast(sessions, intensityIdx),
     [sessions, intensityIdx],
   );
+  const showingPreview = !plansLoading && !plansError && plans === null;
+  const displayPlans = plans ?? STARTER_PLANS;
 
   useEffect(() => {
     if (!rootRef.current) return;
@@ -335,7 +370,7 @@ export function WhatIfPanel() {
   return (
     <div ref={rootRef} className="mt-10 space-y-8">
       {/* plan suggestions */}
-      <div className="wi-fade glass rounded-2xl p-7">
+      <div className="wi-fade glass-strong rounded-2xl p-7">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="font-mono text-[10px] tracking-[0.3em] text-[var(--fg-mute)]">
@@ -345,8 +380,11 @@ export function WhatIfPanel() {
               Three coach-authored options
             </h2>
             <p className="mt-1 text-sm text-[var(--fg-dim)]">
-              Generated from your profile + fingerprint. Tap one to load it
-              into the sliders below.
+              Generated from your profile + fingerprint. Tap
+              <span className="mx-1 rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-[11px] text-[var(--fg)]">
+                GENERATE 3 PLANS
+              </span>
+              to replace the previews below with live model output.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -403,15 +441,23 @@ export function WhatIfPanel() {
           </div>
         )}
 
-        {plans && (
+        {showingPreview && (
+          <div className="mt-5 rounded-xl border border-[var(--glass-border)] bg-[var(--surface)]/70 px-4 py-3 text-sm text-[var(--fg-dim)]">
+            Preview cards are shown by default so this section stays visible.
+            Generate to fetch model-authored plans.
+          </div>
+        )}
+
+        {displayPlans.length > 0 && (
           <div className="mt-6 grid gap-4 md:grid-cols-3">
-            {plans.map((p, i) => (
+            {displayPlans.map((p, i) => (
               <PlanCard
                 key={i}
                 plan={p}
                 index={i}
-                applied={appliedPlanIdx === i}
-                onApply={() => applyPlan(p, i)}
+                applied={!showingPreview && appliedPlanIdx === i}
+                preview={showingPreview}
+                onApply={showingPreview ? undefined : () => applyPlan(p, i)}
               />
             ))}
           </div>
@@ -472,18 +518,20 @@ function PlanCard({
   plan,
   index,
   applied,
+  preview,
   onApply,
 }: {
   plan: PlanCandidate;
   index: number;
   applied: boolean;
-  onApply: () => void;
+  preview: boolean;
+  onApply?: () => void;
 }) {
   const { icon: Icon, tone } = philosophyVisual(plan.philosophy);
   const mix = plan.exercise_mix;
   return (
     <div
-      className="glass relative flex flex-col rounded-2xl p-5 transition-all"
+      className="glass-strong relative flex flex-col rounded-2xl p-5 transition-all"
       style={
         applied
           ? {
@@ -509,6 +557,7 @@ function PlanCard({
       </div>
       <p className="font-mono text-[10px] tracking-[0.3em] text-[var(--fg-mute)]">
         OPTION {String.fromCharCode(65 + index)} · {plan.philosophy.toUpperCase()}
+        {preview ? " · PREVIEW" : ""}
       </p>
       <h3 className="mt-1 font-display text-lg font-medium text-[var(--fg)]">
         {plan.plan_name}
@@ -562,12 +611,18 @@ function PlanCard({
         {plan.rationale}
       </p>
 
-      <button
-        onClick={onApply}
-        className="mt-5 w-full rounded-lg border border-[var(--glass-border)] bg-[var(--surface-2)] py-2 font-mono text-[10px] tracking-[0.25em] text-[var(--fg-dim)] transition-colors hover:border-[var(--accent)] hover:text-[var(--fg)]"
-      >
-        {applied ? "APPLIED ✓" : "USE THIS PLAN"}
-      </button>
+      {preview ? (
+        <div className="mt-5 rounded-lg border border-dashed border-[var(--glass-border)] bg-[var(--surface)]/55 px-3 py-2 text-center font-mono text-[10px] tracking-[0.22em] text-[var(--fg-mute)]">
+          GENERATE TO LOAD LIVE PLAN
+        </div>
+      ) : (
+        <button
+          onClick={onApply}
+          className="mt-5 w-full rounded-lg border border-[var(--glass-border)] bg-[var(--surface-2)] py-2 font-mono text-[10px] tracking-[0.25em] text-[var(--fg-dim)] transition-colors hover:border-[var(--accent)] hover:text-[var(--fg)]"
+        >
+          {applied ? "APPLIED ✓" : "USE THIS PLAN"}
+        </button>
+      )}
     </div>
   );
 }

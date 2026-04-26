@@ -38,7 +38,6 @@ export function ProfileDrawer({ open, onClose }: Props) {
   const backdropRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraft({ ...DEFAULTS, ...profile });
   }, [profile, open]);
 
