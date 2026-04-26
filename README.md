@@ -12,6 +12,12 @@ Built for **BroncoHacks 2026**.
 
 ---
 
+## System flow
+
+![UML Sequence Diagram](docs/img/uml_sequence.png)
+
+---
+
 ## How it works
 
 ```
