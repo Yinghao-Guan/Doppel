@@ -101,7 +101,7 @@ export function SignalRadar({ signals }: Props) {
         <svg
           viewBox={`0 0 ${SIZE} ${SIZE}`}
           width="100%"
-          height="auto"
+          style={{ height: "auto" }}
           className="block"
         >
           <defs>

@@ -347,3 +347,16 @@ solana/**/target/
 
 # Demo opening video build (fonts, generated PNGs, intermediate clips, output MP4)
 demo/
+
+### Python ###
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
