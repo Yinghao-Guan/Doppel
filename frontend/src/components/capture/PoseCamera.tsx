@@ -19,7 +19,12 @@ import { FormPill } from "./FormPill";
 import { CoachCaption } from "./CoachCaption";
 import { useVoiceStore, readVoiceState } from "@/lib/voice-store";
 import * as voiceClient from "@/lib/voice-client";
-import { pickCue, COMMON_CUES, END_SET_LINE } from "@/lib/live-coach";
+import {
+  pickCue,
+  pickRealtimeCue,
+  COMMON_CUES,
+  END_SET_LINE,
+} from "@/lib/live-coach";
 
 const WASM_BASE =
   "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm";
@@ -219,14 +224,13 @@ export function PoseCamera() {
             drawSkeleton(ctx, landmarks, canvas.width, canvas.height, latestForm);
 
             const count = analyzer.ingest(landmarks);
+
+            // Path A — Rep-completion cue (only when a rep counts)
             if (count !== reps) {
               setReps(count);
               if (isCapturing) {
                 const fp = analyzer.finish();
                 setFingerprint(fp);
-                // Live coach: pick a cue based on the rep that just landed
-                // and (asynchronously) speak it. pickCue handles throttling
-                // and dedupe internally — no extra guard needed here.
                 const v = readVoiceState();
                 const cue = pickCue(fp.reps, {
                   lastCueAt: v.lastCueAt,
@@ -239,6 +243,27 @@ export function PoseCamera() {
                   void voiceClient.synthesizeAndPlay(cue.text);
                 }
               }
+            }
+
+            // Path B — Real-time cue (every frame). Fires for in-progress
+            // problems that DON'T produce counted reps: shallow squats, knees
+            // caving, forward lean, standing idle, slow descent. Without this
+            // the coach goes silent during exactly the moments it should be
+            // most active. pickRealtimeCue handles isCapturing gating and
+            // shares throttle state with pickCue via voice-store.
+            const nowMs = performance.now();
+            const realtime = analyzer.getRealtimeState(nowMs);
+            const vRt = readVoiceState();
+            const realtimeCue = pickRealtimeCue(
+              realtime,
+              { lastCueAt: vRt.lastCueAt, lastTriggerId: vRt.lastTriggerId },
+              isCapturing,
+              nowMs,
+            );
+            if (realtimeCue) {
+              useVoiceStore.getState().recordCue(realtimeCue.triggerId, nowMs);
+              void voiceClient.synthesizeAndPlay(realtimeCue.text);
+              analyzer.consumeFlags();
             }
 
             const newForm = analyzer.getLastFormScore();
