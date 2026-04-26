@@ -18,6 +18,14 @@ export function angleDeg(a: Landmark, b: Landmark, c: Landmark): number {
 
 type Phase = "standing" | "descending" | "ascending";
 
+/**
+ * Diagnostic logging — DEV ONLY. Flip to false to silence.
+ * Removed entirely in the follow-up fix PR; this file is on a temporary
+ * `diagnose-rep-detection` branch for data collection.
+ */
+const DIAG = true;
+const SNAPSHOT_EVERY_N_FRAMES = 30; // ~once a second at 30fps
+
 export class SquatAnalyzer {
   private phase: Phase = "standing";
   private currentMin = 180;
@@ -28,13 +36,18 @@ export class SquatAnalyzer {
   private framesAbove = 0;
   private asymSum = 0;
   private asymCount = 0;
+  private frameCounter = 0; // diag only
 
   constructor() {
     this.lastTransitionMs = nowMs();
+    if (DIAG) console.log("[analyzer] constructor — fresh instance");
   }
 
   ingest(landmarks: Landmark[]): number {
-    if (landmarks.length < 33) return this.reps.length;
+    if (landmarks.length < 33) {
+      if (DIAG) console.log("[analyzer] frame skipped: <33 landmarks");
+      return this.reps.length;
+    }
 
     const lHip = landmarks[L.L_HIP];
     const lKnee = landmarks[L.L_KNEE];
@@ -44,9 +57,21 @@ export class SquatAnalyzer {
     const rAnkle = landmarks[L.R_ANKLE];
 
     const required = [lHip, lKnee, lAnkle, rHip, rKnee, rAnkle];
-    for (const lm of required) {
-      if (!lm) return this.reps.length;
-      if ((lm.visibility ?? 1) < SQUAT.MIN_VISIBILITY) return this.reps.length;
+    const labels = ["L_HIP", "L_KNEE", "L_ANKLE", "R_HIP", "R_KNEE", "R_ANKLE"];
+    for (let i = 0; i < required.length; i++) {
+      const lm = required[i];
+      if (!lm) {
+        if (DIAG) console.log(`[analyzer] frame skipped: missing ${labels[i]}`);
+        return this.reps.length;
+      }
+      const vis = lm.visibility ?? 1;
+      if (vis < SQUAT.MIN_VISIBILITY) {
+        if (DIAG)
+          console.log(
+            `[analyzer] frame skipped: low visibility on ${labels[i]} (${vis.toFixed(2)})`,
+          );
+        return this.reps.length;
+      }
     }
 
     const lAngle = angleDeg(lHip, lKnee, lAnkle);
@@ -77,6 +102,10 @@ export class SquatAnalyzer {
       this.phase === "standing" &&
       this.framesBelow >= SQUAT.MIN_FRAMES_FOR_TRANSITION
     ) {
+      if (DIAG)
+        console.log(
+          `[analyzer] standing → descending  framesBelow=${this.framesBelow}  kneeAngle=${kneeAngle.toFixed(1)}  t=${now.toFixed(0)}`,
+        );
       this.phase = "descending";
       this.lastTransitionMs = now;
       this.currentMin = kneeAngle;
@@ -91,10 +120,11 @@ export class SquatAnalyzer {
       const durationMs = now - this.lastTransitionMs;
       this.framesAbove = 0;
 
-      if (
+      const validDuration =
         durationMs >= SQUAT.MIN_REP_DURATION_MS &&
-        durationMs <= SQUAT.MAX_REP_DURATION_MS
-      ) {
+        durationMs <= SQUAT.MAX_REP_DURATION_MS;
+
+      if (validDuration) {
         const asymmetry =
           this.asymCount > 0 ? this.asymSum / this.asymCount : 0;
         const depthScore = clamp((180 - this.currentMin - 70) / 30, 0, 1);
@@ -109,6 +139,19 @@ export class SquatAnalyzer {
           formScore,
           asymmetryPct: clamp(asymmetry, 0, 1),
         });
+        if (DIAG)
+          console.log(
+            `[analyzer] descending → standing  framesAbove=3  durationMs=${durationMs.toFixed(0)}  depth=${(180 - this.currentMin).toFixed(1)}  formScore=${formScore.toFixed(2)}  ✅ REP #${this.reps.length} COMMITTED`,
+          );
+      } else {
+        const reason =
+          durationMs < SQUAT.MIN_REP_DURATION_MS
+            ? `too short (${durationMs.toFixed(0)}ms < ${SQUAT.MIN_REP_DURATION_MS}ms)`
+            : `too long (${durationMs.toFixed(0)}ms > ${SQUAT.MAX_REP_DURATION_MS}ms)`;
+        if (DIAG)
+          console.log(
+            `[analyzer] descending → standing  framesAbove=3  durationMs=${durationMs.toFixed(0)}  depth=${(180 - this.currentMin).toFixed(1)}  ❌ REP REJECTED (${reason})`,
+          );
       }
 
       this.phase = "standing";
@@ -117,6 +160,15 @@ export class SquatAnalyzer {
       this.lastTransitionMs = now;
       this.asymSum = 0;
       this.asymCount = 0;
+    }
+
+    // Periodic snapshot so we can see what the state looks like even when
+    // no transitions are firing (the failure mode is "stuck and silent").
+    this.frameCounter += 1;
+    if (DIAG && this.frameCounter % SNAPSHOT_EVERY_N_FRAMES === 0) {
+      console.log(
+        `[analyzer] state  phase=${this.phase}  kneeAngle=${kneeAngle.toFixed(1)}  currentMin=${this.currentMin.toFixed(1)}  framesBelow=${this.framesBelow}  framesAbove=${this.framesAbove}  reps=${this.reps.length}  msSinceTrans=${(now - this.lastTransitionMs).toFixed(0)}`,
+      );
     }
 
     return this.reps.length;
@@ -185,6 +237,10 @@ export class SquatAnalyzer {
   }
 
   reset(): void {
+    if (DIAG)
+      console.log(
+        `[analyzer] reset() called — clearing state (was: phase=${this.phase}, reps=${this.reps.length})`,
+      );
     this.phase = "standing";
     this.currentMin = 180;
     this.currentMax = 180;
@@ -194,6 +250,7 @@ export class SquatAnalyzer {
     this.framesAbove = 0;
     this.asymSum = 0;
     this.asymCount = 0;
+    this.frameCounter = 0;
   }
 }
 
