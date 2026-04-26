@@ -1,0 +1,85 @@
+import { NextResponse } from "next/server";
+import {
+  GeminiAuthError,
+  GeminiConnectionError,
+  GeminiModelError,
+  GeminiResponseError,
+  geminiChatJson,
+} from "@/lib/gemini";
+import {
+  WHATIF_SCHEMA,
+  WHATIF_SYSTEM,
+  buildWhatIfUserMessage,
+} from "@/lib/coach-prompts";
+import type { WhatIfRequest, WhatIfResponse } from "@/lib/coach-types";
+
+export const runtime = "nodejs";
+
+function validate(body: unknown): WhatIfRequest | string {
+  if (!body || typeof body !== "object") return "Request body must be a JSON object.";
+  const b = body as Partial<WhatIfRequest>;
+  if (!b.profile || typeof b.profile !== "object") return "Missing 'profile'.";
+  if (!b.fingerprint || typeof b.fingerprint !== "object") return "Missing 'fingerprint'.";
+  if (!b.current_plan || typeof b.current_plan !== "object") return "Missing 'current_plan'.";
+  if (!b.before_predictions || typeof b.before_predictions !== "object") return "Missing 'before_predictions'.";
+  if (!b.after_predictions || typeof b.after_predictions !== "object") return "Missing 'after_predictions'.";
+  if (typeof b.change_description !== "string" || b.change_description.trim().length === 0) {
+    return "Missing 'change_description' (non-empty string).";
+  }
+  return b as WhatIfRequest;
+}
+
+export async function POST(req: Request) {
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+
+  const validated = validate(body);
+  if (typeof validated === "string") {
+    return NextResponse.json({ error: validated }, { status: 400 });
+  }
+
+  try {
+    const result = await geminiChatJson<WhatIfResponse>(
+      [
+        { role: "system", content: WHATIF_SYSTEM },
+        { role: "user", content: buildWhatIfUserMessage(validated) },
+      ],
+      WHATIF_SCHEMA,
+      0.4,
+    );
+
+    if (!result?.result) {
+      return NextResponse.json(
+        { error: "Model output missing 'result' object." },
+        { status: 500 },
+      );
+    }
+    return NextResponse.json(result satisfies WhatIfResponse);
+  } catch (err) {
+    return errorResponse(err);
+  }
+}
+
+function errorResponse(err: unknown): NextResponse {
+  if (err instanceof GeminiAuthError) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+  if (err instanceof GeminiConnectionError) {
+    return NextResponse.json({ error: err.message }, { status: 503 });
+  }
+  if (err instanceof GeminiModelError) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+  if (err instanceof GeminiResponseError) {
+    return NextResponse.json(
+      { error: err.message, raw: err.raw },
+      { status: 502 },
+    );
+  }
+  const message = err instanceof Error ? err.message : "Unknown error.";
+  return NextResponse.json({ error: message }, { status: 500 });
+}
