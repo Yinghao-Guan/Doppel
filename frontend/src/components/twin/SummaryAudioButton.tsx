@@ -7,14 +7,19 @@
  * the live-cue audio path in voice-client (which creates fresh Audio
  * elements per cue and can't be paused/resumed).
  *
- * Lazily synthesizes the first time the user clicks. Subsequent clicks
- * toggle play/pause on the cached Blob (instant). Auto-resets to "play"
- * state when audio ends.
+ * Behavior:
+ * - Lazy synthesis on text arrival so the first click is instant.
+ * - Click toggles play/pause on the cached Blob.
+ * - Auto-plays ONCE per new fingerprint: when the user finishes a set
+ *   and lands on Twin, the summary speaks itself. Re-rendering or
+ *   re-navigating to Twin without a new set stays silent.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Play, Pause, Loader2, Volume2 } from "lucide-react";
 import { synthesize } from "@/lib/voice-client";
 import { useVoiceStore } from "@/lib/voice-store";
+import { useAthleteStore } from "@/lib/athlete-store";
+import { useTwinAudioStore } from "@/lib/twin-audio-store";
 
 type State = "idle" | "loading" | "playing" | "paused" | "error";
 
@@ -30,6 +35,13 @@ export function SummaryAudioButton({ text, prefetch = true }: Props) {
   const urlRef = useRef<string | null>(null);
   const enabled = useVoiceStore((s) => s.enabled);
   const muted = useVoiceStore((s) => s.muted);
+  const fingerprintTs = useAthleteStore(
+    (s) => s.fingerprint?.timestamp ?? null,
+  );
+  const lastAutoPlayedTs = useTwinAudioStore(
+    (s) => s.lastAutoPlayedTimestamp,
+  );
+  const markAutoPlayed = useTwinAudioStore((s) => s.markAutoPlayed);
 
   // Eagerly fetch the audio so the first click is instant.
   useEffect(() => {
@@ -99,6 +111,46 @@ export function SummaryAudioButton({ text, prefetch = true }: Props) {
       setState("error");
     }
   }, [state, ensureAudio, muted, enabled]);
+
+  // First-time auto-play: when a brand-new fingerprint lands and we haven't
+  // already auto-played for this timestamp, fire once. Re-renders / repeat
+  // navigation without a new set stay silent (the timestamp comparison gates
+  // it). Marking happens after the play() promise resolves either way so a
+  // blocked autoplay doesn't retry on every render.
+  useEffect(() => {
+    if (!fingerprintTs || !text || !enabled || muted) return;
+    if (fingerprintTs === lastAutoPlayedTs) return;
+
+    let cancelled = false;
+    void (async () => {
+      const audio = await ensureAudio();
+      if (cancelled || !audio) {
+        if (!cancelled) markAutoPlayed(fingerprintTs);
+        return;
+      }
+      setState("playing");
+      try {
+        await audio.play();
+      } catch (err) {
+        console.warn("[summary-audio] autoplay rejected", err);
+        setState("idle");
+      } finally {
+        if (!cancelled) markAutoPlayed(fingerprintTs);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    fingerprintTs,
+    lastAutoPlayedTs,
+    text,
+    enabled,
+    muted,
+    ensureAudio,
+    markAutoPlayed,
+  ]);
 
   const disabled = !enabled || muted || !text;
 
