@@ -38,6 +38,18 @@ def init_db() -> None:
                 created_at INTEGER NOT NULL
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS badge_claims (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                wallet TEXT NOT NULL,
+                badge_id TEXT NOT NULL,
+                mint_address TEXT NOT NULL,
+                tx_signature TEXT NOT NULL,
+                metadata_uri TEXT NOT NULL,
+                claimed_at INTEGER NOT NULL,
+                UNIQUE(wallet, badge_id)
+            )
+        """)
         conn.commit()
 
 
@@ -72,6 +84,59 @@ def get_records_for_wallet(wallet: str) -> list[dict]:
             (wallet,),
         ).fetchall()
         return [dict(row) for row in rows]
+
+
+def get_records_for_wallet_asc(wallet: str) -> list[dict]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM training_records WHERE wallet = ? ORDER BY timestamp ASC, id ASC",
+            (wallet,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def save_badge_claim(
+    wallet: str,
+    badge_id: str,
+    mint_address: str,
+    tx_signature: str,
+    metadata_uri: str,
+    claimed_at: int | None = None,
+) -> int:
+    with get_conn() as conn:
+        cur = conn.execute(
+            """INSERT INTO badge_claims
+               (wallet, badge_id, mint_address, tx_signature, metadata_uri, claimed_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (
+                wallet,
+                badge_id,
+                mint_address,
+                tx_signature,
+                metadata_uri,
+                claimed_at or int(time.time()),
+            ),
+        )
+        conn.commit()
+        return cur.lastrowid
+
+
+def get_badge_claims_for_wallet(wallet: str) -> list[dict]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM badge_claims WHERE wallet = ? ORDER BY claimed_at DESC, id DESC",
+            (wallet,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def get_badge_claim(wallet: str, badge_id: str) -> dict | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM badge_claims WHERE wallet = ? AND badge_id = ?",
+            (wallet, badge_id),
+        ).fetchone()
+        return dict(row) if row else None
 
 
 def upsert_nonce(wallet: str, nonce: str) -> None:
