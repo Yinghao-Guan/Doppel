@@ -344,3 +344,4 @@ CLAUDE.md
 AGENTS.md
 
 solana/**/target/
+solana/badge-minter.json
