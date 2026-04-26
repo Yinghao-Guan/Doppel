@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("2uX6mMi35SdGfBCfJidEnjRjTo1cXAVEQGeJdtrm1up7");
 
 #[program]
 pub mod athlete_proof {
