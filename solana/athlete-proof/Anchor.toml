@@ -6,10 +6,10 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-athlete_proof = "2uX6mMi35SdGfBCfJidEnjRjTo1cXAVEQGeJdtrm1up7"
+athlete_proof = "A6KXpSqEwEUJyQwFcgM2fSptHjmXHUMyijb2ihAc2hjd"
 
 [programs.devnet]
-athlete_proof = "2uX6mMi35SdGfBCfJidEnjRjTo1cXAVEQGeJdtrm1up7"
+athlete_proof = "A6KXpSqEwEUJyQwFcgM2fSptHjmXHUMyijb2ihAc2hjd"
 
 [registry]
 url = "https://api.apr.dev"

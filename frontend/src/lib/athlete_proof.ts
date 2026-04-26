@@ -1,14 +1,20 @@
-{
+/**
+ * Program IDL in camelCase format in order to be used in JS/TS.
+ *
+ * Note that this is only a type helper and is not the actual IDL. The original
+ * IDL can be found at `target/idl/athlete_proof.json`.
+ */
+export type AthleteProof = {
   "address": "A6KXpSqEwEUJyQwFcgM2fSptHjmXHUMyijb2ihAc2hjd",
   "metadata": {
-    "name": "athlete_proof",
+    "name": "athleteProof",
     "version": "0.1.0",
     "spec": "0.1.0",
     "description": "AthleteTwin onchain training proof program"
   },
   "instructions": [
     {
-      "name": "claim_badge",
+      "name": "claimBadge",
       "docs": [
         "Record a badge claim on-chain. The PDA guarantees a wallet can only claim",
         "a given badge id once, while the config gates claims behind the backend authority."
@@ -25,7 +31,7 @@
       ],
       "accounts": [
         {
-          "name": "badge_config",
+          "name": "badgeConfig",
           "writable": true,
           "pda": {
             "seeds": [
@@ -50,7 +56,7 @@
           }
         },
         {
-          "name": "badge_account",
+          "name": "badgeAccount",
           "writable": true,
           "pda": {
             "seeds": [
@@ -70,7 +76,7 @@
               },
               {
                 "kind": "arg",
-                "path": "badge_id"
+                "path": "badgeId"
               }
             ]
           }
@@ -84,27 +90,27 @@
           "signer": true
         },
         {
-          "name": "system_program",
+          "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "badge_id",
+          "name": "badgeId",
           "type": "string"
         },
         {
-          "name": "badge_mint",
+          "name": "badgeMint",
           "type": "pubkey"
         },
         {
-          "name": "metadata_uri",
+          "name": "metadataUri",
           "type": "string"
         }
       ]
     },
     {
-      "name": "initialize_badge_config",
+      "name": "initializeBadgeConfig",
       "docs": [
         "Create the singleton badge config that authorizes server-side badge claims."
       ],
@@ -120,7 +126,7 @@
       ],
       "accounts": [
         {
-          "name": "badge_config",
+          "name": "badgeConfig",
           "writable": true,
           "pda": {
             "seeds": [
@@ -150,14 +156,14 @@
           "signer": true
         },
         {
-          "name": "system_program",
+          "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "initialize_profile",
+      "name": "initializeProfile",
       "docs": [
         "Create an on-chain profile for a new athlete wallet."
       ],
@@ -202,14 +208,14 @@
           "signer": true
         },
         {
-          "name": "system_program",
+          "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
     },
     {
-      "name": "submit_training_proof",
+      "name": "submitTrainingProof",
       "docs": [
         "Submit a verifiable training proof on-chain."
       ],
@@ -246,7 +252,7 @@
               {
                 "kind": "account",
                 "path": "profile.total_workouts",
-                "account": "AthleteProfile"
+                "account": "athleteProfile"
               }
             ]
           }
@@ -281,13 +287,13 @@
           "signer": true
         },
         {
-          "name": "system_program",
+          "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "exercise_type",
+          "name": "exerciseType",
           "type": "string"
         },
         {
@@ -295,15 +301,15 @@
           "type": "u16"
         },
         {
-          "name": "form_score",
+          "name": "formScore",
           "type": "u8"
         },
         {
-          "name": "prediction_score",
+          "name": "predictionScore",
           "type": "u8"
         },
         {
-          "name": "proof_hash",
+          "name": "proofHash",
           "type": {
             "array": [
               "u8",
@@ -316,7 +322,7 @@
   ],
   "accounts": [
     {
-      "name": "AthleteProfile",
+      "name": "athleteProfile",
       "discriminator": [
         197,
         244,
@@ -329,7 +335,7 @@
       ]
     },
     {
-      "name": "BadgeAccount",
+      "name": "badgeAccount",
       "discriminator": [
         196,
         11,
@@ -342,7 +348,7 @@
       ]
     },
     {
-      "name": "BadgeConfig",
+      "name": "badgeConfig",
       "discriminator": [
         118,
         207,
@@ -355,7 +361,7 @@
       ]
     },
     {
-      "name": "TrainingProof",
+      "name": "trainingProof",
       "discriminator": [
         198,
         94,
@@ -370,7 +376,7 @@
   ],
   "events": [
     {
-      "name": "BadgeClaimed",
+      "name": "badgeClaimed",
       "discriminator": [
         11,
         176,
@@ -383,7 +389,7 @@
       ]
     },
     {
-      "name": "ProofSubmitted",
+      "name": "proofSubmitted",
       "discriminator": [
         160,
         51,
@@ -399,38 +405,38 @@
   "errors": [
     {
       "code": 6000,
-      "name": "InvalidScore",
+      "name": "invalidScore",
       "msg": "Score must be between 0 and 100."
     },
     {
       "code": 6001,
-      "name": "ExerciseTypeTooLong",
+      "name": "exerciseTypeTooLong",
       "msg": "Exercise type must be 32 characters or fewer."
     },
     {
       "code": 6002,
-      "name": "Unauthorized",
+      "name": "unauthorized",
       "msg": "Signer does not own this profile."
     },
     {
       "code": 6003,
-      "name": "BadgeIdTooLong",
+      "name": "badgeIdTooLong",
       "msg": "Badge id must be 32 characters or fewer."
     },
     {
       "code": 6004,
-      "name": "MetadataUriTooLong",
+      "name": "metadataUriTooLong",
       "msg": "Metadata URI must be 200 characters or fewer."
     },
     {
       "code": 6005,
-      "name": "UnauthorizedBadgeAuthority",
+      "name": "unauthorizedBadgeAuthority",
       "msg": "Signer is not the authorized badge authority."
     }
   ],
   "types": [
     {
-      "name": "AthleteProfile",
+      "name": "athleteProfile",
       "type": {
         "kind": "struct",
         "fields": [
@@ -439,22 +445,22 @@
             "type": "pubkey"
           },
           {
-            "name": "total_workouts",
+            "name": "totalWorkouts",
             "type": "u32"
           },
           {
-            "name": "best_form_score",
+            "name": "bestFormScore",
             "type": "u8"
           },
           {
-            "name": "created_at",
+            "name": "createdAt",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "BadgeAccount",
+      "name": "badgeAccount",
       "type": {
         "kind": "struct",
         "fields": [
@@ -463,26 +469,26 @@
             "type": "pubkey"
           },
           {
-            "name": "badge_id",
+            "name": "badgeId",
             "type": "string"
           },
           {
-            "name": "badge_mint",
+            "name": "badgeMint",
             "type": "pubkey"
           },
           {
-            "name": "metadata_uri",
+            "name": "metadataUri",
             "type": "string"
           },
           {
-            "name": "claimed_at",
+            "name": "claimedAt",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "BadgeClaimed",
+      "name": "badgeClaimed",
       "type": {
         "kind": "struct",
         "fields": [
@@ -491,26 +497,26 @@
             "type": "pubkey"
           },
           {
-            "name": "badge_id",
+            "name": "badgeId",
             "type": "string"
           },
           {
-            "name": "badge_mint",
+            "name": "badgeMint",
             "type": "pubkey"
           },
           {
-            "name": "metadata_uri",
+            "name": "metadataUri",
             "type": "string"
           },
           {
-            "name": "claimed_at",
+            "name": "claimedAt",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "BadgeConfig",
+      "name": "badgeConfig",
       "type": {
         "kind": "struct",
         "fields": [
@@ -519,14 +525,14 @@
             "type": "pubkey"
           },
           {
-            "name": "created_at",
+            "name": "createdAt",
             "type": "i64"
           }
         ]
       }
     },
     {
-      "name": "ProofSubmitted",
+      "name": "proofSubmitted",
       "type": {
         "kind": "struct",
         "fields": [
@@ -535,7 +541,7 @@
             "type": "pubkey"
           },
           {
-            "name": "exercise_type",
+            "name": "exerciseType",
             "type": "string"
           },
           {
@@ -543,11 +549,11 @@
             "type": "u16"
           },
           {
-            "name": "form_score",
+            "name": "formScore",
             "type": "u8"
           },
           {
-            "name": "prediction_score",
+            "name": "predictionScore",
             "type": "u8"
           },
           {
@@ -558,7 +564,7 @@
       }
     },
     {
-      "name": "TrainingProof",
+      "name": "trainingProof",
       "type": {
         "kind": "struct",
         "fields": [
@@ -567,7 +573,7 @@
             "type": "pubkey"
           },
           {
-            "name": "exercise_type",
+            "name": "exerciseType",
             "type": "string"
           },
           {
@@ -575,15 +581,15 @@
             "type": "u16"
           },
           {
-            "name": "form_score",
+            "name": "formScore",
             "type": "u8"
           },
           {
-            "name": "prediction_score",
+            "name": "predictionScore",
             "type": "u8"
           },
           {
-            "name": "proof_hash",
+            "name": "proofHash",
             "type": {
               "array": [
                 "u8",
@@ -599,4 +605,4 @@
       }
     }
   ]
-}
+};

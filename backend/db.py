@@ -43,6 +43,7 @@ def init_db() -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 wallet TEXT NOT NULL,
                 badge_id TEXT NOT NULL,
+                badge_account TEXT NOT NULL DEFAULT '',
                 mint_address TEXT NOT NULL,
                 tx_signature TEXT NOT NULL,
                 metadata_uri TEXT NOT NULL,
@@ -50,6 +51,7 @@ def init_db() -> None:
                 UNIQUE(wallet, badge_id)
             )
         """)
+        ensure_column(conn, "badge_claims", "badge_account", "TEXT NOT NULL DEFAULT ''")
         conn.commit()
 
 
@@ -98,6 +100,7 @@ def get_records_for_wallet_asc(wallet: str) -> list[dict]:
 def save_badge_claim(
     wallet: str,
     badge_id: str,
+    badge_account: str,
     mint_address: str,
     tx_signature: str,
     metadata_uri: str,
@@ -106,11 +109,12 @@ def save_badge_claim(
     with get_conn() as conn:
         cur = conn.execute(
             """INSERT INTO badge_claims
-               (wallet, badge_id, mint_address, tx_signature, metadata_uri, claimed_at)
-               VALUES (?, ?, ?, ?, ?, ?)""",
+               (wallet, badge_id, badge_account, mint_address, tx_signature, metadata_uri, claimed_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
             (
                 wallet,
                 badge_id,
+                badge_account,
                 mint_address,
                 tx_signature,
                 metadata_uri,
@@ -165,3 +169,17 @@ def delete_nonce(wallet: str) -> None:
     with get_conn() as conn:
         conn.execute("DELETE FROM nonces WHERE wallet = ?", (wallet,))
         conn.commit()
+
+
+def ensure_column(
+    conn: sqlite3.Connection,
+    table_name: str,
+    column_name: str,
+    column_def: str,
+) -> None:
+    columns = {
+        row["name"]
+        for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    }
+    if column_name not in columns:
+        conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_def}")

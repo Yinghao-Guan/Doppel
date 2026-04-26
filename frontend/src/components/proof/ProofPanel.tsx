@@ -30,6 +30,7 @@ interface Badge {
   claimable: boolean;
   progress: number;
   target: number;
+  badge_account: string | null;
   mint_address: string | null;
   tx_signature: string | null;
   metadata_uri: string;
@@ -50,6 +51,10 @@ function explorerTxLink(signature: string): string {
 
 function explorerTokenLink(mint: string): string {
   return `https://explorer.solana.com/address/${mint}?cluster=devnet`;
+}
+
+function explorerAccountLink(address: string): string {
+  return `https://explorer.solana.com/address/${address}?cluster=devnet`;
 }
 
 export function ProofPanel() {
@@ -439,6 +444,16 @@ export function ProofPanel() {
 
                 {badge.claimed && badge.mint_address && badge.tx_signature && (
                   <div className="mt-4 space-y-2 text-[0.7rem] font-mono text-[var(--fg-dim)]">
+                    {badge.badge_account && (
+                      <a
+                        href={explorerAccountLink(badge.badge_account)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block underline hover:opacity-80"
+                      >
+                        Badge PDA: {badge.badge_account.slice(0, 16)}…{badge.badge_account.slice(-8)}
+                      </a>
+                    )}
                     <a
                       href={explorerTokenLink(badge.mint_address)}
                       target="_blank"

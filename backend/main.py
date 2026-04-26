@@ -36,6 +36,26 @@ from proof import generate_proof_hash, proof_summary
 
 app = FastAPI(title="AthleteTwin API")
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+BACKEND_ROOT = Path(__file__).resolve().parent
+
+
+def load_env_files() -> None:
+    for env_path in (PROJECT_ROOT / ".env", BACKEND_ROOT / ".env"):
+        if not env_path.exists():
+            continue
+        for raw_line in env_path.read_text().splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip()
+            if not key:
+                continue
+            os.environ.setdefault(key, value)
+
+
+load_env_files()
 
 
 def get_allowed_origins() -> list[str]:
@@ -199,6 +219,7 @@ def claim_badge(body: BadgeClaimIn) -> dict:
     save_badge_claim(
         wallet=body.wallet,
         badge_id=body.badge_id,
+        badge_account=minted["badge_account"],
         mint_address=minted["mint_address"],
         tx_signature=minted["tx_signature"],
         metadata_uri=metadata_uri,
@@ -286,6 +307,7 @@ def merge_badge_and_claim(badge: dict, claim: dict | None) -> dict:
         return {
             **badge,
             "mint_address": None,
+            "badge_account": None,
             "tx_signature": None,
             "metadata_uri": badge_metadata_uri(badge["id"]),
             "claimed_at": None,
@@ -294,6 +316,7 @@ def merge_badge_and_claim(badge: dict, claim: dict | None) -> dict:
         **badge,
         "claimed": True,
         "claimable": False,
+        "badge_account": claim["badge_account"] or None,
         "mint_address": claim["mint_address"],
         "tx_signature": claim["tx_signature"],
         "metadata_uri": claim["metadata_uri"],
@@ -320,6 +343,7 @@ def mint_badge_nft(*, wallet: str, badge: dict, metadata_uri: str) -> dict[str, 
     env = os.environ.copy()
     env["BADGE_NAME"] = badge["name"]
     env["BADGE_SYMBOL"] = "DOPPEL"
+    env["BADGE_ID"] = badge["id"]
     env["BADGE_METADATA_URI"] = metadata_uri
     env["BADGE_RECIPIENT"] = wallet
 
@@ -343,10 +367,15 @@ def mint_badge_nft(*, wallet: str, badge: dict, metadata_uri: str) -> dict[str, 
     except json.JSONDecodeError as exc:
         raise HTTPException(status_code=500, detail="Badge minter returned invalid JSON.") from exc
 
-    if not payload.get("mintAddress") or not payload.get("txSignature"):
+    if (
+        not payload.get("mintAddress")
+        or not payload.get("txSignature")
+        or not payload.get("badgeAccount")
+    ):
         raise HTTPException(status_code=500, detail="Badge minter returned incomplete result.")
 
     return {
+        "badge_account": payload["badgeAccount"],
         "mint_address": payload["mintAddress"],
         "tx_signature": payload["txSignature"],
     }

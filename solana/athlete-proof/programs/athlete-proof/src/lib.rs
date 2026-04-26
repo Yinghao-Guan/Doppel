@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("2uX6mMi35SdGfBCfJidEnjRjTo1cXAVEQGeJdtrm1up7");
+declare_id!("A6KXpSqEwEUJyQwFcgM2fSptHjmXHUMyijb2ihAc2hjd");
 
 #[program]
 pub mod athlete_proof {
@@ -58,6 +58,51 @@ pub mod athlete_proof {
 
         Ok(())
     }
+
+    /// Create the singleton badge config that authorizes server-side badge claims.
+    pub fn initialize_badge_config(ctx: Context<InitializeBadgeConfig>) -> Result<()> {
+        let config = &mut ctx.accounts.badge_config;
+        config.authority = ctx.accounts.authority.key();
+        config.created_at = Clock::get()?.unix_timestamp;
+        Ok(())
+    }
+
+    /// Record a badge claim on-chain. The PDA guarantees a wallet can only claim
+    /// a given badge id once, while the config gates claims behind the backend authority.
+    pub fn claim_badge(
+        ctx: Context<ClaimBadge>,
+        badge_id: String,
+        badge_mint: Pubkey,
+        metadata_uri: String,
+    ) -> Result<()> {
+        require!(badge_id.len() <= BadgeAccount::MAX_BADGE_ID_LEN, AthleteError::BadgeIdTooLong);
+        require!(
+            metadata_uri.len() <= BadgeAccount::MAX_METADATA_URI_LEN,
+            AthleteError::MetadataUriTooLong
+        );
+        require_keys_eq!(
+            ctx.accounts.badge_config.authority,
+            ctx.accounts.authority.key(),
+            AthleteError::UnauthorizedBadgeAuthority
+        );
+
+        let badge_account = &mut ctx.accounts.badge_account;
+        badge_account.owner = ctx.accounts.owner.key();
+        badge_account.badge_id = badge_id.clone();
+        badge_account.badge_mint = badge_mint;
+        badge_account.metadata_uri = metadata_uri.clone();
+        badge_account.claimed_at = Clock::get()?.unix_timestamp;
+
+        emit!(BadgeClaimed {
+            owner: badge_account.owner,
+            badge_id,
+            badge_mint,
+            metadata_uri,
+            claimed_at: badge_account.claimed_at,
+        });
+
+        Ok(())
+    }
 }
 
 // ── Accounts ─────────────────────────────────────────────────────────────────
@@ -108,6 +153,51 @@ pub struct SubmitTrainingProof<'info> {
     pub system_program: Program<'info, System>,
 }
 
+#[derive(Accounts)]
+pub struct InitializeBadgeConfig<'info> {
+    #[account(
+        init,
+        payer = authority,
+        space = BadgeConfig::SPACE,
+        seeds = [b"badge-config"],
+        bump,
+    )]
+    pub badge_config: Account<'info, BadgeConfig>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(badge_id: String)]
+pub struct ClaimBadge<'info> {
+    #[account(
+        mut,
+        seeds = [b"badge-config"],
+        bump,
+    )]
+    pub badge_config: Account<'info, BadgeConfig>,
+
+    #[account(
+        init,
+        payer = authority,
+        space = BadgeAccount::SPACE,
+        seeds = [b"badge", owner.key().as_ref(), badge_id.as_bytes()],
+        bump,
+    )]
+    pub badge_account: Account<'info, BadgeAccount>,
+
+    /// CHECK: The wallet receiving the badge. This pubkey is persisted in BadgeAccount.
+    pub owner: UncheckedAccount<'info>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 
 #[account]
@@ -140,6 +230,32 @@ impl TrainingProof {
     pub const SPACE: usize = 8 + 32 + 36 + 2 + 1 + 1 + 32 + 8;
 }
 
+#[account]
+pub struct BadgeConfig {
+    pub authority: Pubkey, // 32
+    pub created_at: i64,   // 8
+}
+
+impl BadgeConfig {
+    pub const SPACE: usize = 8 + 32 + 8;
+}
+
+#[account]
+pub struct BadgeAccount {
+    pub owner: Pubkey,       // 32
+    pub badge_id: String,    // 4 + 32
+    pub badge_mint: Pubkey,  // 32
+    pub metadata_uri: String,// 4 + 200
+    pub claimed_at: i64,     // 8
+}
+
+impl BadgeAccount {
+    pub const MAX_BADGE_ID_LEN: usize = 32;
+    pub const MAX_METADATA_URI_LEN: usize = 200;
+    // discriminator(8) + owner(32) + badge_id(4+32) + badge_mint(32) + metadata_uri(4+200) + claimed_at(8)
+    pub const SPACE: usize = 8 + 32 + 36 + 32 + 204 + 8;
+}
+
 // ── Events ────────────────────────────────────────────────────────────────────
 
 #[event]
@@ -152,6 +268,15 @@ pub struct ProofSubmitted {
     pub timestamp: i64,
 }
 
+#[event]
+pub struct BadgeClaimed {
+    pub owner: Pubkey,
+    pub badge_id: String,
+    pub badge_mint: Pubkey,
+    pub metadata_uri: String,
+    pub claimed_at: i64,
+}
+
 // ── Errors ────────────────────────────────────────────────────────────────────
 
 #[error_code]
@@ -162,4 +287,10 @@ pub enum AthleteError {
     ExerciseTypeTooLong,
     #[msg("Signer does not own this profile.")]
     Unauthorized,
+    #[msg("Badge id must be 32 characters or fewer.")]
+    BadgeIdTooLong,
+    #[msg("Metadata URI must be 200 characters or fewer.")]
+    MetadataUriTooLong,
+    #[msg("Signer is not the authorized badge authority.")]
+    UnauthorizedBadgeAuthority,
 }
