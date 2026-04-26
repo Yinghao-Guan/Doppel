@@ -1,4 +1,5 @@
 import type { PredictInput, PredictOutput, RawPredictInput } from "@/types/predict";
+import { BACKEND_URL } from "@/lib/solana";
 
 const ALIAS_MAP: Record<string, keyof PredictInput> = {
   age: "Age",
@@ -92,7 +93,7 @@ export function normalizeInput(raw: RawPredictInput): PredictInput {
 }
 
 export async function predict(raw: RawPredictInput): Promise<PredictOutput> {
-  const response = await fetch("/api/predict", {
+  const response = await fetch(`${BACKEND_URL}/predict`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -103,8 +104,10 @@ export async function predict(raw: RawPredictInput): Promise<PredictOutput> {
   if (!response.ok) {
     let message = "Prediction request failed.";
     try {
-      const payload = (await response.json()) as { error?: string };
-      if (payload.error) {
+      const payload = (await response.json()) as { error?: string; detail?: string };
+      if (payload.detail) {
+        message = payload.detail;
+      } else if (payload.error) {
         message = payload.error;
       }
     } catch {

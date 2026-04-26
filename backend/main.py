@@ -1,6 +1,7 @@
 """FastAPI backend for AthleteTwin — wallet auth, training records, proof hashes."""
 from __future__ import annotations
 
+import os
 import secrets
 import sys
 import time
@@ -22,13 +23,24 @@ from db import (
     save_training_record,
     upsert_nonce,
 )
+from ml.predict import predict_from_payload
 from proof import generate_proof_hash, proof_summary
 
 app = FastAPI(title="AthleteTwin API")
 
+
+def get_allowed_origins() -> list[str]:
+    raw = os.getenv("ALLOWED_ORIGINS", "").strip()
+    if raw:
+        return [origin.strip() for origin in raw.split(",") if origin.strip()]
+    return [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=get_allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -87,6 +99,14 @@ def verify_signature(body: VerifyRequest) -> dict:
     # In production: return a real JWT. For hackathon: return a simple token.
     token = secrets.token_hex(32)
     return {"token": token, "wallet": body.wallet}
+
+
+@app.post("/predict")
+def predict(body: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return predict_from_payload(body)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Prediction failed: {exc}") from exc
 
 
 # ─── Training Records ────────────────────────────────────────────────────────

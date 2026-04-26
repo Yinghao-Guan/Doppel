@@ -167,13 +167,13 @@ export function PoseCamera() {
       }
     })();
 
+    const videoEl = videoRef.current;
     return () => {
       cancelled = true;
       cancelAnimationFrame(rafRef.current);
-      const v = videoRef.current;
-      const stream = v?.srcObject as MediaStream | null;
+      const stream = videoEl?.srcObject as MediaStream | null;
       stream?.getTracks().forEach((t) => t.stop());
-      if (v) v.srcObject = null;
+      if (videoEl) videoEl.srcObject = null;
       landmarkerRef.current?.close();
       landmarkerRef.current = null;
     };

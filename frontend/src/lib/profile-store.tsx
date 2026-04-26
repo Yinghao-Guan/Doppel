@@ -45,7 +45,6 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (raw) setProfileState(JSON.parse(raw));
     } catch {
       // ignore — fresh state is fine

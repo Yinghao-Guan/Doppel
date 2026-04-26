@@ -380,6 +380,11 @@ def build_supporting_signals(input_data: dict[str, object]) -> dict[str, float]:
     }
 
 
+def predict_from_payload(user_input: dict[str, object]) -> dict[str, object]:
+    """Stable importable entrypoint for API usage."""
+    return predict_athlete_outcome(user_input)
+
+
 def predict_athlete_outcome(user_input: dict[str, object]) -> dict[str, object]:
     processed_input = preprocess_input(user_input)
     scores = run_model(processed_input)
@@ -440,7 +445,7 @@ def main() -> None:
         if not raw.strip():
             raise SystemExit("Expected JSON payload on stdin.")
         payload = json.loads(raw)
-        result = predict_athlete_outcome(payload)
+        result = predict_from_payload(payload)
         print(json.dumps(result, indent=2 if args.json else None))
         return
 
@@ -448,7 +453,7 @@ def main() -> None:
     if case_name not in DEMO_CASES:
         raise SystemExit(f"Unknown demo case: {case_name}")
 
-    result = predict_athlete_outcome(DEMO_CASES[case_name])
+    result = predict_from_payload(DEMO_CASES[case_name])
     if args.json:
         print(json.dumps(result, indent=2))
         return
