@@ -19,7 +19,7 @@ import { FormPill } from "./FormPill";
 import { CoachCaption } from "./CoachCaption";
 import { useVoiceStore, readVoiceState } from "@/lib/voice-store";
 import * as voiceClient from "@/lib/voice-client";
-import { pickCue, COMMON_CUES } from "@/lib/live-coach";
+import { pickCue, COMMON_CUES, END_SET_LINE } from "@/lib/live-coach";
 
 const WASM_BASE =
   "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm";
@@ -230,12 +230,12 @@ export function PoseCamera() {
                 const v = readVoiceState();
                 const cue = pickCue(fp.reps, {
                   lastCueAt: v.lastCueAt,
-                  lastCueText: v.lastCueText,
+                  lastTriggerId: v.lastTriggerId,
                 });
                 if (cue) {
                   useVoiceStore
                     .getState()
-                    .recordCue(cue.text, performance.now());
+                    .recordCue(cue.triggerId, performance.now());
                   void voiceClient.synthesizeAndPlay(cue.text);
                 }
               }
@@ -283,7 +283,7 @@ export function PoseCamera() {
 
   const start = () => {
     // Reset cue history so a fresh set can speak from the first rep.
-    useVoiceStore.setState({ lastCueAt: 0, lastCueText: null });
+    useVoiceStore.setState({ lastCueAt: 0, lastTriggerId: null });
     // Pre-warm the audio cache so the first few cues play instantly.
     voiceClient.prefetch(COMMON_CUES);
 
@@ -309,10 +309,10 @@ export function PoseCamera() {
         const v = readVoiceState();
         const cue = pickCue(partialFp.reps, {
           lastCueAt: v.lastCueAt,
-          lastCueText: v.lastCueText,
+          lastTriggerId: v.lastTriggerId,
         });
         if (cue) {
-          useVoiceStore.getState().recordCue(cue.text, performance.now());
+          useVoiceStore.getState().recordCue(cue.triggerId, performance.now());
           void voiceClient.synthesizeAndPlay(cue.text);
         }
         if (fakeRep >= DEMO_TARGET_REPS) {
@@ -322,7 +322,7 @@ export function PoseCamera() {
           }
           setIsCapturing(false);
           // Final flourish at the end of the demo set.
-          void voiceClient.synthesizeAndPlay("Set complete. Great work.");
+          void voiceClient.synthesizeAndPlay(END_SET_LINE);
         }
       }, DEMO_REP_INTERVAL_MS);
       return;
@@ -340,7 +340,7 @@ export function PoseCamera() {
     const fp = analyzerRef.current.finish();
     setFingerprint(fp);
     setIsCapturing(false);
-    void voiceClient.synthesizeAndPlay("Set complete. Great work.");
+    void voiceClient.synthesizeAndPlay(END_SET_LINE);
   };
 
   const retry = () => {
