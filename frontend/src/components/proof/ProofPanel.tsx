@@ -1,23 +1,35 @@
 "use client";
 
 import { useState } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { BACKEND_URL } from "@/lib/solana";
+import { PublicKey } from "@solana/web3.js";
+import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
+import { BACKEND_URL, PROGRAM_ID } from "@/lib/solana";
+import IDL from "@/lib/athlete_proof.json";
 
 interface ProofResult {
   id: number;
   proof_hash: string;
+  txSignature: string;
   summary: {
     exercise: string;
     reps: number;
     form_score: number;
-    proof_hash: string;
   };
 }
 
+function hexToBytes(hex: string): number[] {
+  const bytes: number[] = [];
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes.push(parseInt(hex.slice(i, i + 2), 16));
+  }
+  return bytes;
+}
+
 export function ProofPanel() {
-  const { publicKey } = useWallet();
+  const { publicKey, wallet } = useWallet();
+  const { connection } = useConnection();
   const { setVisible } = useWalletModal();
 
   const [exercise, setExercise] = useState("squat");
@@ -28,12 +40,13 @@ export function ProofPanel() {
   const [enduranceDelta, setEnduranceDelta] = useState(5);
   const [injuryRiskDelta, setInjuryRiskDelta] = useState(5);
 
+  const [status, setStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<ProofResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit() {
-    if (!publicKey) {
+    if (!publicKey || !wallet) {
       setVisible(true);
       return;
     }
@@ -42,6 +55,8 @@ export function ProofPanel() {
     setResult(null);
 
     try {
+      // 1. Save record off-chain and get proof hash from backend
+      setStatus("Saving record & generating proof hash…");
       const res = await fetch(`${BACKEND_URL}/training/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -56,16 +71,70 @@ export function ProofPanel() {
           injury_risk_delta: injuryRiskDelta,
         }),
       });
-
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.detail ?? "Failed to save record.");
       }
+      const { id, proof_hash, summary } = await res.json();
 
-      const data: ProofResult = await res.json();
-      setResult(data);
+      // 2. Build Anchor program client
+      const provider = new AnchorProvider(
+        connection,
+        wallet.adapter as never,
+        { commitment: "confirmed" }
+      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const program = new Program(IDL as any, provider);
+      const programId = new PublicKey(PROGRAM_ID);
+
+      const [profilePda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("profile"), publicKey.toBuffer()],
+        programId
+      );
+
+      // 3. Initialize profile if it doesn't exist yet
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const accounts = program.account as any;
+      try {
+        await accounts.athleteProfile.fetch(profilePda);
+      } catch {
+        setStatus("Creating on-chain profile…");
+        await program.methods
+          .initializeProfile()
+          .accounts({ profile: profilePda, user: publicKey })
+          .rpc();
+      }
+
+      // 4. Fetch current workout count to derive proof PDA
+      const profileAccount = await accounts.athleteProfile.fetch(profilePda);
+      const workoutIndex: number = profileAccount.totalWorkouts as number;
+      const indexBuf = Buffer.alloc(4);
+      indexBuf.writeUInt32LE(workoutIndex);
+
+      const [proofPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("proof"), publicKey.toBuffer(), indexBuf],
+        programId
+      );
+
+      // 5. Submit proof on-chain
+      setStatus("Waiting for wallet signature…");
+      const proofHashBytes = hexToBytes(proof_hash);
+      const tx = await program.methods
+        .submitTrainingProof(
+          exercise,
+          reps,
+          formScore,
+          Math.round((formScore + (100 - fatigueScore)) / 2), // prediction_score
+          proofHashBytes
+        )
+        .accounts({ proof: proofPda, profile: profilePda, user: publicKey })
+        .rpc();
+
+      setStatus(null);
+      setResult({ id, proof_hash, txSignature: tx, summary });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error.");
+      setStatus(null);
     } finally {
       setSubmitting(false);
     }
@@ -93,14 +162,16 @@ export function ProofPanel() {
           </select>
         </label>
 
-        {[
-          { label: "Reps", value: reps, set: setReps, min: 1, max: 50 },
-          { label: "Form Score (0–100)", value: formScore, set: setFormScore, min: 0, max: 100 },
-          { label: "Fatigue Score (0–100)", value: fatigueScore, set: setFatigueScore, min: 0, max: 100 },
-          { label: "Strength Delta", value: strengthDelta, set: setStrengthDelta, min: -50, max: 50 },
-          { label: "Endurance Delta", value: enduranceDelta, set: setEnduranceDelta, min: -50, max: 50 },
-          { label: "Injury Risk Delta", value: injuryRiskDelta, set: setInjuryRiskDelta, min: -50, max: 50 },
-        ].map(({ label, value, set, min, max }) => (
+        {(
+          [
+            { label: "Reps", value: reps, set: setReps, min: 1, max: 50 },
+            { label: "Form Score (0–100)", value: formScore, set: setFormScore, min: 0, max: 100 },
+            { label: "Fatigue Score (0–100)", value: fatigueScore, set: setFatigueScore, min: 0, max: 100 },
+            { label: "Strength Delta", value: strengthDelta, set: setStrengthDelta, min: -50, max: 50 },
+            { label: "Endurance Delta", value: enduranceDelta, set: setEnduranceDelta, min: -50, max: 50 },
+            { label: "Injury Risk Delta", value: injuryRiskDelta, set: setInjuryRiskDelta, min: -50, max: 50 },
+          ] as const
+        ).map(({ label, value, set, min, max }) => (
           <label key={label} className="block">
             <span className="eyebrow text-[0.65rem]">{label}</span>
             <input
@@ -108,7 +179,7 @@ export function ProofPanel() {
               value={value}
               min={min}
               max={max}
-              onChange={(e) => set(Number(e.target.value))}
+              onChange={(e) => (set as (v: number) => void)(Number(e.target.value))}
               className="mt-1 w-full rounded-lg bg-[var(--surface)] border border-[var(--border)] px-3 py-2 text-sm text-[var(--fg)]"
             />
           </label>
@@ -120,7 +191,7 @@ export function ProofPanel() {
           className="cta w-full mt-2 py-3 font-mono text-sm tracking-[0.15em] disabled:opacity-50"
         >
           {submitting
-            ? "SUBMITTING…"
+            ? (status ?? "SUBMITTING…")
             : publicKey
             ? "SUBMIT ONCHAIN PROOF"
             : "CONNECT WALLET TO SUBMIT"}
@@ -139,52 +210,52 @@ export function ProofPanel() {
 
         {!result && !publicKey && (
           <p className="text-[var(--fg-dim)] text-sm">
-            Connect your wallet and fill in the training record to generate a proof.
+            Connect your wallet and fill in the training record to submit a proof.
           </p>
         )}
 
         {!result && publicKey && (
           <p className="text-[var(--fg-dim)] text-sm">
-            Fill in your training data and click Submit to generate a Solana-ready proof hash.
+            Fill in your training data and click Submit. Your proof hash will be stored permanently on Solana devnet.
           </p>
         )}
 
         {result && (
-          <>
-            <div className="flex items-center gap-2">
-              <span className="text-green-400 font-mono text-xs">✓ PROOF GENERATED</span>
-            </div>
+          <div className="space-y-3">
+            <span className="text-green-400 font-mono text-xs">✓ VERIFIED ON SOLANA</span>
 
-            <div className="space-y-2">
-              <div>
-                <p className="eyebrow text-[0.6rem] text-[var(--fg-dim)]">Record ID</p>
-                <p className="font-mono text-sm text-[var(--fg)]">#{result.id}</p>
-              </div>
-              <div>
-                <p className="eyebrow text-[0.6rem] text-[var(--fg-dim)]">Exercise</p>
-                <p className="font-mono text-sm text-[var(--fg)] capitalize">{result.summary.exercise}</p>
-              </div>
-              <div>
-                <p className="eyebrow text-[0.6rem] text-[var(--fg-dim)]">Reps / Form Score</p>
-                <p className="font-mono text-sm text-[var(--fg)]">
-                  {result.summary.reps} reps · {result.summary.form_score}/100
-                </p>
-              </div>
-              <div>
-                <p className="eyebrow text-[0.6rem] text-[var(--fg-dim)]">SHA-256 Proof Hash</p>
-                <p className="font-mono text-[0.6rem] text-[var(--accent)] break-all leading-relaxed">
-                  {result.proof_hash}
-                </p>
-              </div>
-              <div className="mt-4 rounded-lg bg-[var(--surface)] border border-[var(--border)] p-3">
-                <p className="eyebrow text-[0.6rem] text-[var(--fg-dim)] mb-1">Verified on Solana ✅</p>
-                <p className="text-xs text-[var(--fg-dim)]">
-                  This hash is ready to be submitted to the athlete-proof Anchor program on Solana devnet.
-                  The record is stored off-chain in SQLite; only the hash goes onchain.
-                </p>
-              </div>
+            <div>
+              <p className="eyebrow text-[0.6rem] text-[var(--fg-dim)]">Record ID</p>
+              <p className="font-mono text-sm text-[var(--fg)]">#{result.id}</p>
             </div>
-          </>
+            <div>
+              <p className="eyebrow text-[0.6rem] text-[var(--fg-dim)]">Exercise</p>
+              <p className="font-mono text-sm text-[var(--fg)] capitalize">{result.summary.exercise}</p>
+            </div>
+            <div>
+              <p className="eyebrow text-[0.6rem] text-[var(--fg-dim)]">Reps / Form Score</p>
+              <p className="font-mono text-sm text-[var(--fg)]">
+                {result.summary.reps} reps · {result.summary.form_score}/100
+              </p>
+            </div>
+            <div>
+              <p className="eyebrow text-[0.6rem] text-[var(--fg-dim)]">SHA-256 Proof Hash</p>
+              <p className="font-mono text-[0.6rem] text-[var(--accent)] break-all leading-relaxed">
+                {result.proof_hash}
+              </p>
+            </div>
+            <div>
+              <p className="eyebrow text-[0.6rem] text-[var(--fg-dim)]">Transaction</p>
+              <a
+                href={`https://explorer.solana.com/tx/${result.txSignature}?cluster=devnet`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-mono text-[0.6rem] text-[var(--accent)] break-all leading-relaxed underline hover:opacity-80"
+              >
+                {result.txSignature.slice(0, 20)}…{result.txSignature.slice(-8)}
+              </a>
+            </div>
+          </div>
         )}
       </div>
     </div>

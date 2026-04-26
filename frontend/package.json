@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
     "@mediapipe/tasks-vision": "^0.10.18",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.0",

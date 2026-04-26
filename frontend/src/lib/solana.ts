@@ -2,7 +2,7 @@
  * Solana program constants and helpers.
  * Update PROGRAM_ID after running `anchor deploy`.
  */
-export const PROGRAM_ID = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS";
+export const PROGRAM_ID = "2uX6mMi35SdGfBCfJidEnjRjTo1cXAVEQGeJdtrm1up7";
 export const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
 
