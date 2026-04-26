@@ -238,6 +238,15 @@ web_modules/
 .parcel-cache
 
 # Next.js build output
+
+# Local backend/runtime artifacts
+backend/athlete.db
+backend/__pycache__/
+backend/ml/__pycache__/
+*.pyc
+
+# Local Solana validator artifacts
+solana/athlete-proof/test-ledger/
 .next
 out
 
@@ -344,3 +353,4 @@ CLAUDE.md
 AGENTS.md
 
 solana/**/target/
+solana/badge-minter.json
