@@ -268,6 +268,19 @@ export function PoseCamera() {
     };
   }, []);
 
+  // Keyboard shortcut: M toggles coach mute (only when not typing in a field).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "m" && e.key !== "M") return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      e.preventDefault();
+      toggleMuted();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggleMuted]);
+
   const start = () => {
     // Reset cue history so a fresh set can speak from the first rep.
     useVoiceStore.setState({ lastCueAt: 0, lastCueText: null });
