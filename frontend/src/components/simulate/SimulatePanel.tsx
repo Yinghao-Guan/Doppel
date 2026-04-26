@@ -89,14 +89,19 @@ export function SimulatePanel({ baseline }: { baseline: PredictScores }) {
   useEffect(() => {
     if (!rootRef.current) return;
     const ctx = gsap.context(() => {
-      gsap.from(".sim-fade", {
-        opacity: 0,
-        y: 18,
-        filter: "blur(6px)",
-        stagger: 0.06,
-        duration: 0.7,
-        ease: "power3.out",
-      });
+      gsap.fromTo(
+        ".sim-fade",
+        { opacity: 0, y: 18, filter: "blur(6px)" },
+        {
+          opacity: 1,
+          y: 0,
+          filter: "blur(0px)",
+          stagger: 0.06,
+          duration: 0.7,
+          ease: "power3.out",
+          clearProps: "filter,transform,opacity",
+        },
+      );
     }, rootRef);
     return () => ctx.revert();
   }, []);
