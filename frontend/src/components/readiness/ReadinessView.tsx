@@ -124,12 +124,9 @@ export function ReadinessView() {
 
           <SummaryCard summary={result.summary} />
 
-          <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
-            <ExplanationList items={result.explanations} />
-            <div>
-              <RecommendationCards items={result.recommendations} />
-            </div>
-          </div>
+          <ExplanationList items={result.explanations} />
+
+          <RecommendationCards items={result.recommendations} />
         </div>
       )}
 

@@ -24,26 +24,16 @@ export function ExplanationList({ items }: Props) {
     return () => ctx.revert();
   }, [items]);
 
+  // Show only the first explanation as a one-liner, mirroring the Summary
+  // card directly above. Keeps the dashboard hierarchy crisp and readable.
+  const headline = items[0] ?? "";
+
   return (
-    <div ref={rootRef} className="rd-fade glass rounded-2xl p-6">
-      <p className="eyebrow mb-4">Why</p>
-      <ul className="space-y-3">
-        {items.map((text, i) => (
-          <li
-            key={i}
-            className="expl-row relative pl-4 text-sm leading-relaxed text-[var(--fg-dim)]"
-          >
-            <span
-              className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full"
-              style={{
-                background: "var(--accent)",
-                boxShadow: "0 0 8px var(--accent)",
-              }}
-            />
-            {text}
-          </li>
-        ))}
-      </ul>
+    <div ref={rootRef} className="rd-fade glass-strong rounded-2xl p-7">
+      <p className="eyebrow mb-3 text-center">Do this next</p>
+      <p className="expl-row font-display text-xl leading-relaxed text-[var(--fg)] sm:text-2xl">
+        {headline}
+      </p>
     </div>
   );
 }

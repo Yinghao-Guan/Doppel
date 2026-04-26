@@ -27,7 +27,6 @@ export function RecommendationCards({ items }: Props) {
 
   return (
     <div ref={rootRef} className="rd-fade">
-      <p className="eyebrow mb-4">Do this next</p>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((text, i) => (
           <article
