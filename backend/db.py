@@ -6,11 +6,6 @@ import time
 from pathlib import Path
 
 DB_PATH = Path(__file__).parent / "athlete.db"
-NONCE_TTL_SECONDS = 300
-
-
-class NoncePendingError(Exception):
-    """Raised when a fresh nonce already exists for this wallet."""
 
 
 def get_conn() -> sqlite3.Connection:
@@ -36,10 +31,6 @@ def init_db() -> None:
                 timestamp INTEGER NOT NULL
             )
         """)
-        conn.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_training_records_proof_hash "
-            "ON training_records(proof_hash)"
-        )
         conn.execute("""
             CREATE TABLE IF NOT EXISTS nonces (
                 wallet TEXT PRIMARY KEY,
@@ -84,24 +75,11 @@ def get_records_for_wallet(wallet: str) -> list[dict]:
 
 
 def upsert_nonce(wallet: str, nonce: str) -> None:
-    """Insert a nonce. If a pending one exists, raise NoncePendingError so
-    attackers can't overwrite a victim's pending nonce by spamming /auth/nonce."""
-    now = int(time.time())
     with get_conn() as conn:
-        # Sweep expired nonce for this wallet first.
         conn.execute(
-            "DELETE FROM nonces WHERE wallet = ? AND created_at < ?",
-            (wallet, now - NONCE_TTL_SECONDS),
+            "INSERT OR REPLACE INTO nonces (wallet, nonce, created_at) VALUES (?, ?, ?)",
+            (wallet, nonce, int(time.time())),
         )
-        try:
-            conn.execute(
-                "INSERT INTO nonces (wallet, nonce, created_at) VALUES (?, ?, ?)",
-                (wallet, nonce, now),
-            )
-        except sqlite3.IntegrityError as exc:
-            raise NoncePendingError(
-                "A nonce is already pending for this wallet. Wait or complete the existing flow."
-            ) from exc
         conn.commit()
 
 
@@ -112,7 +90,8 @@ def get_nonce(wallet: str) -> str | None:
         ).fetchone()
         if not row:
             return None
-        if int(time.time()) - row["created_at"] > NONCE_TTL_SECONDS:
+        # Nonce expires after 5 minutes
+        if int(time.time()) - row["created_at"] > 300:
             return None
         return row["nonce"]
 

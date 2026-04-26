@@ -10,11 +10,8 @@ import {
   WHATIF_SCHEMA,
   WHATIF_SYSTEM,
   buildWhatIfUserMessage,
-  findProseDigitViolation,
-  ConstraintRejectedError,
 } from "@/lib/coach-prompts";
 import type { WhatIfRequest, WhatIfResponse } from "@/lib/coach-types";
-import { readJsonBody } from "@/lib/api-guards";
 
 export const runtime = "nodejs";
 
@@ -33,10 +30,14 @@ function validate(body: unknown): WhatIfRequest | string {
 }
 
 export async function POST(req: Request) {
-  const parsed = await readJsonBody(req);
-  if (!parsed.ok) return parsed.response;
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
 
-  const validated = validate(parsed.body);
+  const validated = validate(body);
   if (typeof validated === "string") {
     return NextResponse.json({ error: validated }, { status: 400 });
   }
@@ -57,16 +58,6 @@ export async function POST(req: Request) {
         { status: 500 },
       );
     }
-    const violation =
-      findProseDigitViolation(result.result.interpretation) ??
-      findProseDigitViolation(result.result.key_insight);
-    if (violation) {
-      console.error("what-if digit-scrub rejected output:", violation);
-      return NextResponse.json(
-        { error: "Model produced disallowed numeric content." },
-        { status: 502 },
-      );
-    }
     return NextResponse.json(result satisfies WhatIfResponse);
   } catch (err) {
     return errorResponse(err);
@@ -74,9 +65,6 @@ export async function POST(req: Request) {
 }
 
 function errorResponse(err: unknown): NextResponse {
-  if (err instanceof ConstraintRejectedError) {
-    return NextResponse.json({ error: err.message }, { status: 400 });
-  }
   if (err instanceof GeminiAuthError) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
@@ -87,9 +75,11 @@ function errorResponse(err: unknown): NextResponse {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
   if (err instanceof GeminiResponseError) {
-    console.error("Gemini response error:", err.message, err.raw);
-    return NextResponse.json({ error: "Upstream model error." }, { status: 502 });
+    return NextResponse.json(
+      { error: err.message, raw: err.raw },
+      { status: 502 },
+    );
   }
-  console.error("Coach what-if route error:", err);
-  return NextResponse.json({ error: "Internal error." }, { status: 500 });
+  const message = err instanceof Error ? err.message : "Unknown error.";
+  return NextResponse.json({ error: message }, { status: 500 });
 }
