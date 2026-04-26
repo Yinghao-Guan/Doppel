@@ -94,11 +94,11 @@ export function HeroOverlay({ onStart }: { onStart?: () => void }) {
           opacity: 1,
           y: 0,
           scale: 1,
-          // Tween the blur away, then strip the inline filter so the CSS
-          // `drop-shadow(...)` glow on `.doppel-letter` becomes visible again.
-          // (Only `.doppel-letter` has a CSS filter we want to keep — the
-          // `.reveal` class's `filter: blur(6px)` is the *hidden* state, so
-          // clearProps would re-blur those elements.)
+          // Tween the blur away, then strip the inline filter so nothing
+          // lingers as a separate composited layer. clearProps is NOT
+          // applied to `.reveal*` because their CSS class still applies
+          // `filter: blur(6px)` as the hidden state — clearing the inline
+          // value would re-blur them.
           filter: "blur(0px)",
           duration: 1.1,
           stagger: 0.07,

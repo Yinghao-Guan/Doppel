@@ -138,6 +138,14 @@ export function TopoField({
     [],
   );
 
+  // Dispose the locally-constructed geometry on unmount so its GPU buffer
+  // doesn't leak. R3F doesn't auto-dispose externally-passed geometry props.
+  useEffect(() => {
+    return () => {
+      geometry.dispose();
+    };
+  }, [geometry]);
+
   // Build the initial uniforms from the *current* accent so the very first
   // frame already matches the user's saved preference — otherwise we'd flash
   // the violet defaults before the effect below corrects them.

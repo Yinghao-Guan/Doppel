@@ -86,6 +86,18 @@ export function PersistentBackdrop() {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, []);
 
+  // Cap DPR at 1 only when the user has opted into reduced motion. This is the
+  // single signal we trust — heuristics like navigator.deviceMemory misreport
+  // capable iPads as low-end and would aliase the wireframe edges visibly.
+  const [dprMax, setDprMax] = useState(1.5);
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const apply = () => setDprMax(mq.matches ? 1 : 1.5);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
   // Defer the WIREFRAME-TWIN unmount: when isLanding flips off, keep it
   // mounted for the duration of its 1.8s opacity tween, then unmount once
   // it's invisible so the GPU teardown happens later, out of sight.
@@ -112,7 +124,7 @@ export function PersistentBackdrop() {
       className="pointer-events-none fixed inset-0 z-0"
     >
       <Canvas
-        dpr={[1, 1.5]}
+        dpr={[1, dprMax]}
         camera={{ position: [0, 1.6, 6], fov: 65, near: 0.1, far: 200 }}
         gl={{ antialias: true, alpha: false }}
         frameloop={hidden ? "never" : "always"}

@@ -126,6 +126,16 @@ export function WireframeTwin({
     };
   }, [active, material]);
 
+  // Dispose the ShaderMaterial on unmount so its GPU program doesn't leak
+  // across remounts. Geometries come from drei's useGLTF cache and are SHARED
+  // across mounts — disposing them would corrupt the cache and break the next
+  // remount, so they are intentionally left alone.
+  useEffect(() => {
+    return () => {
+      material.dispose();
+    };
+  }, [material]);
+
   useFrame((state, delta) => {
     material.uniforms.uTime.value = state.clock.elapsedTime;
     if (rotateY && groupRef.current) {
