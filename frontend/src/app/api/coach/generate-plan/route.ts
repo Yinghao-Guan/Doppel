@@ -10,11 +10,14 @@ import {
   GENERATE_PLAN_SCHEMA,
   GENERATE_PLAN_SYSTEM,
   buildGeneratePlanUserMessage,
+  findProseDigitViolation,
+  ConstraintRejectedError,
 } from "@/lib/coach-prompts";
 import type {
   GeneratePlanRequest,
   GeneratePlanResponse,
 } from "@/lib/coach-types";
+import { readJsonBody } from "@/lib/api-guards";
 
 export const runtime = "nodejs";
 
@@ -31,14 +34,10 @@ function validate(body: unknown): GeneratePlanRequest | string {
 }
 
 export async function POST(req: Request) {
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
-  }
+  const parsed = await readJsonBody(req);
+  if (!parsed.ok) return parsed.response;
 
-  const validated = validate(body);
+  const validated = validate(parsed.body);
   if (typeof validated === "string") {
     return NextResponse.json({ error: validated }, { status: 400 });
   }
@@ -60,6 +59,27 @@ export async function POST(req: Request) {
         { status: 500 },
       );
     }
+    for (const plan of result.plans) {
+      const violation = findProseDigitViolation(plan?.rationale);
+      if (violation) {
+        console.error("generate-plan digit-scrub rejected output:", violation);
+        return NextResponse.json(
+          { error: "Model produced disallowed numeric content." },
+          { status: 502 },
+        );
+      }
+      const mix = plan?.exercise_mix;
+      if (mix) {
+        const sum = (mix.strength ?? 0) + (mix.cardio ?? 0) + (mix.mobility ?? 0);
+        if (sum < 0.95 || sum > 1.05) {
+          console.error("generate-plan exercise_mix sum out of range:", sum);
+          return NextResponse.json(
+            { error: "Model produced an invalid exercise_mix." },
+            { status: 502 },
+          );
+        }
+      }
+    }
     return NextResponse.json(result satisfies GeneratePlanResponse);
   } catch (err) {
     return errorResponse(err);
@@ -67,6 +87,9 @@ export async function POST(req: Request) {
 }
 
 function errorResponse(err: unknown): NextResponse {
+  if (err instanceof ConstraintRejectedError) {
+    return NextResponse.json({ error: err.message }, { status: 400 });
+  }
   if (err instanceof GeminiAuthError) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
@@ -77,11 +100,9 @@ function errorResponse(err: unknown): NextResponse {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
   if (err instanceof GeminiResponseError) {
-    return NextResponse.json(
-      { error: err.message, raw: err.raw },
-      { status: 502 },
-    );
+    console.error("Gemini response error:", err.message, err.raw);
+    return NextResponse.json({ error: "Upstream model error." }, { status: 502 });
   }
-  const message = err instanceof Error ? err.message : "Unknown error.";
-  return NextResponse.json({ error: message }, { status: 500 });
+  console.error("Coach generate-plan route error:", err);
+  return NextResponse.json({ error: "Internal error." }, { status: 500 });
 }

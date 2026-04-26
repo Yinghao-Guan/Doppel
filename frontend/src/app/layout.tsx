@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Space_Grotesk, Manrope, JetBrains_Mono } from "next/font/google";
 import { AccentProvider } from "@/components/AccentProvider";
 import { ProfileProvider } from "@/lib/profile-store";
@@ -31,11 +32,15 @@ export const metadata: Metadata = {
     "Doppel builds an AI digital twin of your athletic performance. Real-time pose CV plus predictive modeling shows how you'll perform 14 days from now — before you train.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Reading the nonce from the request headers signals Next.js to apply it to
+  // its server-rendered inline scripts under the strict CSP set in middleware.ts.
+  await headers();
+
   return (
     <html
       lang="en"

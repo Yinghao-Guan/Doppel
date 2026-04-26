@@ -7,9 +7,12 @@
 ## Person 1 — CV / Pose Pipeline
 
 **You own:**
-- `components/camera/PoseCamera.tsx`
-- `components/camera/SkeletonOverlay.tsx`
-- `lib/pose/analyzer.ts`
+- `frontend/src/components/capture/PoseCamera.tsx`
+- `frontend/src/components/capture/SkeletonOverlay.ts`
+- `frontend/src/components/capture/CapturePanel.tsx`
+- `frontend/src/components/capture/CameraError.tsx`
+- `frontend/src/components/capture/FormPill.tsx`
+- `frontend/src/lib/pose/*`
 
 **You produce:** a `TrainingFingerprint` (see `types/index.ts`) emitted via `useAthleteStore.setFingerprint(...)` when the user finishes a set.
 
@@ -24,11 +27,16 @@
 ## Person 2 — Prediction Engine + LLM Coach
 
 **You own:**
-- `lib/prediction/engine.ts`
-- `lib/prediction/formulas.ts`
-- `lib/prediction/coach.ts`
-- `app/api/coach/route.ts`
-- `app/api/voice/route.ts`
+- `frontend/src/lib/predict.ts` (frontend normalization)
+- `frontend/src/lib/coach-prompts.ts`
+- `frontend/src/lib/coach-client.ts`
+- `frontend/src/lib/coach-types.ts`
+- `frontend/src/lib/gemini.ts`
+- `frontend/src/app/api/coach/what-if/route.ts`
+- `frontend/src/app/api/coach/generate-plan/route.ts`
+- `frontend/src/app/api/coach/compare-plans/route.ts`
+- `frontend/src/app/api/predict/route.ts`
+- `backend/` (FastAPI + ML predict.py)
 
 **You produce:** a `Projection` and `CoachAdvice` from `(UserProfile, TrainingFingerprint, TrainingPlan)`.
 
@@ -43,10 +51,16 @@
 ## Person 3 — Frontend / Dashboard / UX
 
 **You own:**
-- `app/page.tsx`
-- `app/layout.tsx`
-- `app/globals.css`
-- `components/dashboard/*`
+- `frontend/src/app/page.tsx`
+- `frontend/src/app/layout.tsx`
+- `frontend/src/app/globals.css`
+- `frontend/src/app/proof/page.tsx`
+- `frontend/src/app/what-if/page.tsx`
+- `frontend/src/components/dashboard/*`
+- `frontend/src/components/readiness/*`
+- `frontend/src/components/hero/*`
+- `frontend/src/components/twin/*`
+- `frontend/src/components/Landing*.tsx`, `PageShell.tsx`, `TopNav.tsx`, `SplashScreen.tsx`, etc.
 
 **You produce:** the polished UI everyone sees. You wire the camera component (Person 1) and the simulator component (Person 4) into the page layout. You build the profile form and projection cards.
 
@@ -61,9 +75,9 @@
 ## Person 4 — Simulator / Plan Comparison
 
 **You own:**
-- `components/simulator/PlanCompare.tsx`
-- `components/simulator/WhatIfSliders.tsx`
-- `components/simulator/GrowthCurve.tsx`
+- `frontend/src/components/simulate/SimulatePanel.tsx`
+- `frontend/src/components/whatif/WhatIfPanel.tsx`
+- `frontend/src/components/proof/ProofPanel.tsx`
 
 **You produce:** the "flight simulator" wow moment — A/B/C plan toggle, what-if sliders that re-trigger `simulate()` instantly, recharts growth curve.
 
@@ -77,10 +91,13 @@
 
 ## Shared (don't edit without team-wide agreement)
 
-- `types/index.ts` — data contracts
-- `lib/store/useAthleteStore.ts` — global zustand store
-- `lib/utils.ts` — helpers
-- `package.json`, `tsconfig.json`, `tailwind.config.ts` — build config
+- `types/index.ts` (root) and `frontend/src/types/*` — data contracts
+- `frontend/src/lib/athlete-store.ts` — global zustand store
+- `frontend/src/lib/profile-store.tsx` — profile context
+- `frontend/src/lib/utils.ts` — helpers
+- `frontend/package.json`, `frontend/tsconfig.json`, `frontend/next.config.ts`, `tailwind.config.ts` — build config
+- `frontend/src/middleware.ts` — request middleware (CSP, Origin checks)
+- `solana/athlete-proof/programs/athlete-proof/src/lib.rs` — on-chain program
 
 ---
 

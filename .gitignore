@@ -344,3 +344,9 @@ CLAUDE.md
 AGENTS.md
 
 solana/**/target/
+
+# Backend: never commit local SQLite or processed data dumps.
+backend/*.db
+backend/*.sqlite
+backend/data/processed/*.csv
+backend/data/raw/*.csv

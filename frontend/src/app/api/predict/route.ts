@@ -3,6 +3,8 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
+export const runtime = "nodejs";
+
 function resolveModelScript(): { scriptPath: string; cwd: string } {
   const candidates = [
     {
@@ -33,6 +35,9 @@ function resolveModelScript(): { scriptPath: string; cwd: string } {
 }
 
 export async function POST(request: Request) {
+  if (process.env.VERCEL === "1") {
+    return NextResponse.json({ error: "Not available." }, { status: 410 });
+  }
   try {
     const payload = await request.json();
     const { scriptPath, cwd } = resolveModelScript();
@@ -72,8 +77,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(JSON.parse(result));
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Prediction request failed.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("predict route error:", error);
+    return NextResponse.json({ error: "Prediction failed." }, { status: 500 });
   }
 }
