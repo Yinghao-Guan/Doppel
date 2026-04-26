@@ -1,4 +1,4 @@
-# dopplegang
+# Doppel
 
 > **Train smarter by testing your future first.**
 
