@@ -3,6 +3,7 @@ import { Space_Grotesk, Manrope, JetBrains_Mono } from "next/font/google";
 import { AccentProvider } from "@/components/AccentProvider";
 import { ProfileProvider } from "@/lib/profile-store";
 import PersistentBackdropMount from "@/components/PersistentBackdropMount";
+import { WalletProviderClient } from "@/components/WalletProviderClient";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -42,8 +43,10 @@ export default function RootLayout({
       <body className="min-h-full">
         <AccentProvider>
           <ProfileProvider>
-            <PersistentBackdropMount />
-            {children}
+            <WalletProviderClient>
+              <PersistentBackdropMount />
+              {children}
+            </WalletProviderClient>
           </ProfileProvider>
         </AccentProvider>
       </body>

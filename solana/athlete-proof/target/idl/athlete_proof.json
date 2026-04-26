@@ -1,0 +1,327 @@
+{
+  "address": "2uX6mMi35SdGfBCfJidEnjRjTo1cXAVEQGeJdtrm1up7",
+  "metadata": {
+    "name": "athlete_proof",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "AthleteTwin onchain training proof program"
+  },
+  "instructions": [
+    {
+      "name": "initialize_profile",
+      "docs": [
+        "Create an on-chain profile for a new athlete wallet."
+      ],
+      "discriminator": [
+        32,
+        145,
+        77,
+        213,
+        58,
+        39,
+        251,
+        234
+      ],
+      "accounts": [
+        {
+          "name": "profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "submit_training_proof",
+      "docs": [
+        "Submit a verifiable training proof on-chain."
+      ],
+      "discriminator": [
+        168,
+        204,
+        17,
+        231,
+        11,
+        17,
+        94,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "proof",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  111,
+                  102
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              },
+              {
+                "kind": "account",
+                "path": "profile.total_workouts",
+                "account": "AthleteProfile"
+              }
+            ]
+          }
+        },
+        {
+          "name": "profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  102,
+                  105,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "exercise_type",
+          "type": "string"
+        },
+        {
+          "name": "reps",
+          "type": "u16"
+        },
+        {
+          "name": "form_score",
+          "type": "u8"
+        },
+        {
+          "name": "prediction_score",
+          "type": "u8"
+        },
+        {
+          "name": "proof_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "AthleteProfile",
+      "discriminator": [
+        197,
+        244,
+        74,
+        34,
+        28,
+        55,
+        104,
+        82
+      ]
+    },
+    {
+      "name": "TrainingProof",
+      "discriminator": [
+        198,
+        94,
+        188,
+        184,
+        98,
+        160,
+        13,
+        222
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "ProofSubmitted",
+      "discriminator": [
+        160,
+        51,
+        85,
+        70,
+        249,
+        89,
+        5,
+        139
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidScore",
+      "msg": "Score must be between 0 and 100."
+    },
+    {
+      "code": 6001,
+      "name": "ExerciseTypeTooLong",
+      "msg": "Exercise type must be 32 characters or fewer."
+    },
+    {
+      "code": 6002,
+      "name": "Unauthorized",
+      "msg": "Signer does not own this profile."
+    }
+  ],
+  "types": [
+    {
+      "name": "AthleteProfile",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_workouts",
+            "type": "u32"
+          },
+          {
+            "name": "best_form_score",
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProofSubmitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "exercise_type",
+            "type": "string"
+          },
+          {
+            "name": "reps",
+            "type": "u16"
+          },
+          {
+            "name": "form_score",
+            "type": "u8"
+          },
+          {
+            "name": "prediction_score",
+            "type": "u8"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TrainingProof",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "exercise_type",
+            "type": "string"
+          },
+          {
+            "name": "reps",
+            "type": "u16"
+          },
+          {
+            "name": "form_score",
+            "type": "u8"
+          },
+          {
+            "name": "prediction_score",
+            "type": "u8"
+          },
+          {
+            "name": "proof_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    }
+  ]
+}

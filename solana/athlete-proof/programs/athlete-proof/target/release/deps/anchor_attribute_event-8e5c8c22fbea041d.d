@@ -1,0 +1,5 @@
+/Users/guanyinghao/Projects/BroncoHacks/solana/athlete-proof/programs/athlete-proof/target/release/deps/anchor_attribute_event-8e5c8c22fbea041d.d: /Users/guanyinghao/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anchor-attribute-event-0.30.1/src/lib.rs
+
+/Users/guanyinghao/Projects/BroncoHacks/solana/athlete-proof/programs/athlete-proof/target/release/deps/libanchor_attribute_event-8e5c8c22fbea041d.dylib: /Users/guanyinghao/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anchor-attribute-event-0.30.1/src/lib.rs
+
+/Users/guanyinghao/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anchor-attribute-event-0.30.1/src/lib.rs:

@@ -1,0 +1,1 @@
+/Users/guanyinghao/Projects/BroncoHacks/solana/athlete-proof/programs/athlete-proof/target/sbpf-solana-solana/release/athlete_proof.so: /Users/guanyinghao/Projects/BroncoHacks/solana/athlete-proof/programs/athlete-proof/src/lib.rs

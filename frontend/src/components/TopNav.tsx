@@ -5,11 +5,18 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { AccentSelector } from "@/components/AccentSelector";
+import dynamic from "next/dynamic";
 import { useTransitionNavigate } from "@/lib/page-transition";
+
+const WalletButton = dynamic(
+  () => import("@/components/WalletButton").then((m) => m.WalletButton),
+  { ssr: false }
+);
 
 const NAV_ITEMS: { label: string; href: string; matchPath: string }[] = [
   { label: "CAPTURE", href: "/?step=capture", matchPath: "/" },
   { label: "TWIN", href: "/twin", matchPath: "/twin" },
+  { label: "PROOF", href: "/proof", matchPath: "/proof" },
 ];
 
 type TopNavProps = { hideBrand?: boolean; hideNav?: boolean };
@@ -104,9 +111,7 @@ function TopNavFrame({
           })}
       </nav>
 
-      <div className="cta glass cta-ghost text-xs font-mono tracking-[0.2em] py-2 px-4">
-        BRONCOHACKS&apos;26
-      </div>
+      <WalletButton />
     </header>
   );
 }
