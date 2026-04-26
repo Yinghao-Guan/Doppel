@@ -62,7 +62,7 @@ const SCORE_DEFS = [
   { key: "injury_risk_score" as const,        label: "INJURY RISK",tone: "var(--danger)" },
 ];
 
-export function CapturePanel() {
+export function CapturePanel(_props: { onFinish?: () => void } = {}) {
   const fingerprint = useAthleteStore((s) => s.fingerprint);
   const { profile, isComplete } = useProfile();
   const cv = useCaptureSignals();

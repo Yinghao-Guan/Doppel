@@ -4,6 +4,7 @@ import { AccentProvider } from "@/components/AccentProvider";
 import { ProfileProvider } from "@/lib/profile-store";
 import PersistentBackdropMount from "@/components/PersistentBackdropMount";
 import { WalletProviderClient } from "@/components/WalletProviderClient";
+import SplashScreen from "@/components/SplashScreen";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -46,6 +47,7 @@ export default function RootLayout({
             <WalletProviderClient>
               <PersistentBackdropMount />
               {children}
+              <SplashScreen />
             </WalletProviderClient>
           </ProfileProvider>
         </AccentProvider>

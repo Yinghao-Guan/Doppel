@@ -77,7 +77,12 @@ export function HeroOverlay({ onStart }: { onStart?: () => void }) {
   useIsoLayoutEffect(() => {
     if (!rootRef.current) return;
 
+    let fallbackTimer: number | null = null;
+    let removeListener: (() => void) | null = null;
+
     const ctx = gsap.context(() => {
+      // Lock the hidden state synchronously so the letters never flash
+      // visible while the splash is still on screen.
       if (!introHasPlayed) {
         gsap.set(".doppel-letter", {
           opacity: 0,
@@ -85,90 +90,107 @@ export function HeroOverlay({ onStart }: { onStart?: () => void }) {
           scale: 0.85,
           filter: "blur(20px)",
         });
-
-        const tl = gsap.timeline({
-          defaults: { ease: "power4.out" },
-        });
-
-        tl.to(".doppel-letter", {
-          opacity: 1,
-          y: 0,
-          scale: 1,
-          // Tween the blur away, then strip the inline filter so nothing
-          // lingers as a separate composited layer. clearProps is NOT
-          // applied to `.reveal*` because their CSS class still applies
-          // `filter: blur(6px)` as the hidden state — clearing the inline
-          // value would re-blur them.
-          filter: "blur(0px)",
-          duration: 1.1,
-          stagger: 0.07,
-          clearProps: "filter",
-        })
-          .to(
-            ".reveal-tagline > span",
-            {
-              opacity: 1,
-              y: 0,
-              filter: "blur(0px)",
-              stagger: 0.035,
-              duration: 0.7,
-            },
-            "-=0.55",
-          )
-          .to(
-            ".reveal-sub",
-            { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.7 },
-            "-=0.4",
-          )
-          .to(
-            ".reveal-cta",
-            {
-              opacity: 1,
-              y: 0,
-              filter: "blur(0px)",
-              stagger: 0.08,
-              duration: 0.6,
-            },
-            "-=0.45",
-          );
-
-        introHasPlayed = true;
-      } else {
-        // Skip the reveal — jump elements straight to their final visible
-        // state. For `.doppel-letter`, leave `filter` alone so the CSS
-        // drop-shadow glow stays applied. For `.reveal*`, we MUST set
-        // `filter: blur(0px)` inline because the `.reveal` CSS class still
-        // applies `filter: blur(6px)` in its resting state — leaving it
-        // unset would render the elements blurry.
-        gsap.set(".doppel-letter", { opacity: 1, y: 0, scale: 1 });
-        gsap.set(".reveal-tagline > span", {
-          opacity: 1,
-          y: 0,
-          filter: "blur(0px)",
-        });
-        gsap.set(".reveal-sub", { opacity: 1, y: 0, filter: "blur(0px)" });
-        gsap.set(".reveal-cta", { opacity: 1, y: 0, filter: "blur(0px)" });
       }
 
-      // Subtle perpetual float on each letter. We start with a smooth settle
-      // from the intro's resting y=0 down to y=-4, *then* loop between
-      // y=-4 and y=4. This avoids the 4px snap that the old fromTo created
-      // the moment the intro finished.
-      gsap.utils.toArray<HTMLElement>(".doppel-letter").forEach((el, i) => {
-        const tl = gsap.timeline({
-          delay: introHasPlayed ? 0 : 1.2 + i * 0.05,
-          defaults: { ease: "sine.inOut" },
+      const playIntro = () => {
+        if (!introHasPlayed) {
+          const tl = gsap.timeline({
+            defaults: { ease: "power4.out" },
+          });
+
+          tl.to(".doppel-letter", {
+            opacity: 1,
+            y: 0,
+            scale: 1,
+            filter: "blur(0px)",
+            duration: 1.1,
+            stagger: 0.07,
+            clearProps: "filter",
+          })
+            .to(
+              ".reveal-tagline > span",
+              {
+                opacity: 1,
+                y: 0,
+                filter: "blur(0px)",
+                stagger: 0.035,
+                duration: 0.7,
+              },
+              "-=0.55",
+            )
+            .to(
+              ".reveal-sub",
+              { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.7 },
+              "-=0.4",
+            )
+            .to(
+              ".reveal-cta",
+              {
+                opacity: 1,
+                y: 0,
+                filter: "blur(0px)",
+                stagger: 0.08,
+                duration: 0.6,
+              },
+              "-=0.45",
+            );
+
+          introHasPlayed = true;
+        } else {
+          gsap.set(".doppel-letter", { opacity: 1, y: 0, scale: 1 });
+          gsap.set(".reveal-tagline > span", {
+            opacity: 1,
+            y: 0,
+            filter: "blur(0px)",
+          });
+          gsap.set(".reveal-sub", { opacity: 1, y: 0, filter: "blur(0px)" });
+          gsap.set(".reveal-cta", { opacity: 1, y: 0, filter: "blur(0px)" });
+        }
+
+        gsap.utils.toArray<HTMLElement>(".doppel-letter").forEach((el, i) => {
+          const tl = gsap.timeline({
+            delay: introHasPlayed ? 0 : 1.2 + i * 0.05,
+            defaults: { ease: "sine.inOut" },
+          });
+          tl.to(el, { y: -4, duration: 1.2 + i * 0.09 }).to(el, {
+            y: 4,
+            duration: 2.4 + i * 0.18,
+            repeat: -1,
+            yoyo: true,
+          });
         });
-        tl.to(el, { y: -4, duration: 1.2 + i * 0.09 }).to(el, {
-          y: 4,
-          duration: 2.4 + i * 0.18,
-          repeat: -1,
-          yoyo: true,
+      };
+
+      if (introHasPlayed) {
+        // Already played in this session — jump to final state immediately.
+        playIntro();
+      } else {
+        // Defer the intro until the splash has started fading out so the
+        // letter reveal isn't wasted under the overlay. A 2500ms fallback
+        // covers the case where the splash never mounts (SSR-only path,
+        // disabled-JS, or a future config that skips it).
+        let played = false;
+        const trigger = () => {
+          if (played) return;
+          played = true;
+          if (removeListener) removeListener();
+          if (fallbackTimer !== null) window.clearTimeout(fallbackTimer);
+          playIntro();
+        };
+        window.addEventListener("doppel:splash-dismissed", trigger, {
+          once: true,
         });
-      });
+        removeListener = () =>
+          window.removeEventListener("doppel:splash-dismissed", trigger);
+        fallbackTimer = window.setTimeout(trigger, 2500);
+      }
     }, rootRef);
 
-    return () => ctx.revert();
+    return () => {
+      if (removeListener) removeListener();
+      if (fallbackTimer !== null) window.clearTimeout(fallbackTimer);
+      ctx.revert();
+    };
   }, []);
 
   return (
