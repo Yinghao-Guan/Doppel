@@ -3,7 +3,13 @@ import { Space_Grotesk, Manrope, JetBrains_Mono } from "next/font/google";
 import { AccentProvider } from "@/components/AccentProvider";
 import { ProfileProvider } from "@/lib/profile-store";
 import PersistentBackdropMount from "@/components/PersistentBackdropMount";
+import dynamic from "next/dynamic";
 import "./globals.css";
+
+const WalletProvider = dynamic(
+  () => import("@/components/WalletProvider").then((m) => m.WalletProvider),
+  { ssr: false }
+);
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-display",
@@ -42,8 +48,10 @@ export default function RootLayout({
       <body className="min-h-full">
         <AccentProvider>
           <ProfileProvider>
-            <PersistentBackdropMount />
-            {children}
+            <WalletProvider>
+              <PersistentBackdropMount />
+              {children}
+            </WalletProvider>
           </ProfileProvider>
         </AccentProvider>
       </body>

@@ -4,12 +4,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { AccentSelector } from "@/components/AccentSelector";
+import dynamic from "next/dynamic";
+
+const WalletButton = dynamic(
+  () => import("@/components/WalletButton").then((m) => m.WalletButton),
+  { ssr: false }
+);
 
 const NAV_ITEMS: { label: string; href: string }[] = [
   { label: "CAPTURE", href: "/capture" },
   { label: "DASHBOARD", href: "/dashboard" },
   { label: "READOUT", href: "/readiness" },
   { label: "SIMULATE", href: "/simulate" },
+  { label: "PROOF", href: "/proof" },
 ];
 
 export function TopNav({
@@ -66,9 +73,7 @@ export function TopNav({
         })}
       </nav>
 
-      <div className="cta glass cta-ghost text-xs font-mono tracking-[0.2em] py-2 px-4">
-        BRONCOHACKS&apos;26
-      </div>
+      <WalletButton />
     </header>
   );
 }
