@@ -16,6 +16,31 @@ export function angleDeg(a: Landmark, b: Landmark, c: Landmark): number {
   return (Math.acos(cos) * 180) / Math.PI;
 }
 
+/**
+ * Compute the knee angle for one leg, but only if all three landmarks
+ * (hip, knee, ankle) clear the visibility threshold. Returns null when the
+ * leg can't be reliably measured this frame.
+ *
+ * Used by the bilateral fallback: if one side is occluded (e.g. user
+ * standing sideways to the camera), we still count reps using the visible
+ * side instead of skipping the frame entirely.
+ */
+function evaluateLeg(
+  hip: Landmark | undefined,
+  knee: Landmark | undefined,
+  ankle: Landmark | undefined,
+): number | null {
+  if (!hip || !knee || !ankle) return null;
+  if (
+    (hip.visibility ?? 1) < SQUAT.MIN_VISIBILITY ||
+    (knee.visibility ?? 1) < SQUAT.MIN_VISIBILITY ||
+    (ankle.visibility ?? 1) < SQUAT.MIN_VISIBILITY
+  ) {
+    return null;
+  }
+  return angleDeg(hip, knee, ankle);
+}
+
 type Phase = "standing" | "descending" | "ascending";
 
 export class SquatAnalyzer {
@@ -43,20 +68,32 @@ export class SquatAnalyzer {
     const rKnee = landmarks[L.R_KNEE];
     const rAnkle = landmarks[L.R_ANKLE];
 
-    const required = [lHip, lKnee, lAnkle, rHip, rKnee, rAnkle];
-    for (const lm of required) {
-      if (!lm) return this.reps.length;
-      if ((lm.visibility ?? 1) < SQUAT.MIN_VISIBILITY) return this.reps.length;
+    // Bilateral fallback: count reps as long as at least ONE leg is fully
+    // visible. The user often stands sideways, so the camera-far leg is
+    // partially occluded — but the camera-near leg is enough for rep
+    // detection. Asymmetry only contributes to the running average on
+    // frames where BOTH sides are clearly visible.
+    const lAngle = evaluateLeg(lHip, lKnee, lAnkle);
+    const rAngle = evaluateLeg(rHip, rKnee, rAnkle);
+
+    if (lAngle === null && rAngle === null) {
+      return this.reps.length;
     }
 
-    const lAngle = angleDeg(lHip, lKnee, lAnkle);
-    const rAngle = angleDeg(rHip, rKnee, rAnkle);
-    const kneeAngle = (lAngle + rAngle) / 2;
+    let kneeAngle: number;
+    if (lAngle !== null && rAngle !== null) {
+      kneeAngle = (lAngle + rAngle) / 2;
+      this.asymSum += Math.abs(lAngle - rAngle) / 180;
+      this.asymCount += 1;
+    } else {
+      // One-sided frame — use whichever leg is visible. Skip asymmetry
+      // contribution (we can't measure it without both sides) but still
+      // drive the rep state machine, which only cares about knee flexion.
+      kneeAngle = lAngle ?? rAngle ?? 180;
+    }
 
     this.currentMin = Math.min(this.currentMin, kneeAngle);
     this.currentMax = Math.max(this.currentMax, kneeAngle);
-    this.asymSum += Math.abs(lAngle - rAngle) / 180;
-    this.asymCount += 1;
 
     const now = nowMs();
     const isBelow = kneeAngle < SQUAT.BOTTOM_ANGLE_DEG;
