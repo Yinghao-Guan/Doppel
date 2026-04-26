@@ -30,12 +30,7 @@ export function ExplanationList({ items }: Props) {
 
   return (
     <div ref={rootRef} className="rd-fade glass-strong rounded-2xl p-7">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="eyebrow">Why</p>
-        <span className="font-mono text-[10px] tracking-[0.3em] text-[var(--fg-mute)]">
-          DOPPEL · MODEL
-        </span>
-      </div>
+      <p className="eyebrow mb-3 text-center">Do this next</p>
       <p className="expl-row font-display text-xl leading-relaxed text-[var(--fg)] sm:text-2xl">
         {headline}
       </p>
