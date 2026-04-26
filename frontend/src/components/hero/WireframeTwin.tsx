@@ -1,14 +1,16 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
+import gsap from "gsap";
 
 type WireframeTwinProps = {
   position?: [number, number, number];
   scale?: number;
   rotateY?: boolean;
+  active?: boolean;
 };
 
 const vertexShader = /* glsl */ `
@@ -31,6 +33,7 @@ const vertexShader = /* glsl */ `
 
 const fragmentShader = /* glsl */ `
   uniform float uTime;
+  uniform float uOpacity;
 
   varying vec3 vNormal;
   varying vec3 vViewDir;
@@ -47,23 +50,18 @@ const fragmentShader = /* glsl */ `
     vec3 N = normalize(vNormal);
     vec3 V = normalize(vViewDir);
 
-    // Fresnel — for edge glow + slight hue bias toward silhouette.
     float fres = pow(1.0 - max(0.0, dot(N, V)), 1.6);
 
-    // Hue sweeps up the body and rotates with time. Slight horizontal shift
-    // adds chromatic separation as the model spins.
     float hue = vWorldPos.y * 0.18
               + vWorldPos.x * 0.06
               + uTime * 0.18
               + fres * 0.12;
 
-    // Saturated full-spectrum body color (HDR brightness for bloom).
     vec3 body = hsv2rgb(vec3(fract(hue), 0.95, 1.0)) * 1.8;
 
-    // Strong silhouette edge glow.
     vec3 col = body + fres * 1.4;
 
-    gl_FragColor = vec4(col, 1.0);
+    gl_FragColor = vec4(col, uOpacity);
   }
 `;
 
@@ -71,6 +69,7 @@ export function WireframeTwin({
   position = [3, 0, 0],
   scale = 1.2,
   rotateY = true,
+  active = true,
 }: WireframeTwinProps) {
   const groupRef = useRef<THREE.Group>(null);
   const { scene } = useGLTF("/models/wireframe_man.draco.glb") as unknown as {
@@ -83,17 +82,20 @@ export function WireframeTwin({
         vertexShader,
         fragmentShader,
         wireframe: true,
-        transparent: false,
+        transparent: true,
+        depthWrite: false,
         toneMapped: false,
         uniforms: {
           uTime: { value: 0 },
+          uOpacity: { value: active ? 1 : 0 },
         },
       }),
+    // Material is created once per mount; uOpacity is tweened by the effect below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
   const cloned = useMemo(() => {
-    // Strip skeleton — render rest-pose geometry as plain meshes.
     const group = new THREE.Group();
     scene.traverse((o) => {
       const m = o as THREE.Mesh;
@@ -107,6 +109,22 @@ export function WireframeTwin({
     group.position.sub(center);
     return group;
   }, [scene, material]);
+
+  // Tween opacity when `active` changes so the model fades in/out instead of
+  // popping when the parent decides to mount/unmount it. Linear ease so the
+  // model fade is at constant rate, matching the bloom/vignette/intensity
+  // dimming that happens in parallel.
+  useEffect(() => {
+    const tween = gsap.to(material.uniforms.uOpacity, {
+      value: active ? 1 : 0,
+      duration: 1.8,
+      ease: "none",
+      overwrite: "auto",
+    });
+    return () => {
+      tween.kill();
+    };
+  }, [active, material]);
 
   useFrame((state, delta) => {
     material.uniforms.uTime.value = state.clock.elapsedTime;

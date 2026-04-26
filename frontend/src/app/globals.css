@@ -196,6 +196,9 @@ body {
   will-change: background-position, transform, opacity, filter;
   filter: drop-shadow(0 6px 30px color-mix(in srgb, var(--accent-deep) 50%, transparent))
     drop-shadow(0 0 60px color-mix(in srgb, var(--accent-cyan) 30%, transparent));
+  /* Hidden until the GSAP intro reveals them. Prevents a FOUC where the
+     letters paint at full opacity for one frame before JS hides them. */
+  opacity: 0;
 }
 
 /* Each letter holds its own glowing duplicate underneath for depth. */

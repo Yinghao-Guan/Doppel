@@ -12,16 +12,15 @@ export function PageShell({ children }: { children: React.ReactNode }) {
     // The previous route faded <main> out for the transition — restore it
     // before running the destination intro, otherwise everything stays hidden.
     const main = document.querySelector("main");
-    if (main) gsap.set(main, { opacity: 1, filter: "blur(0px)" });
+    if (main) gsap.set(main, { opacity: 1 });
     const ctx = gsap.context(() => {
       gsap.fromTo(
         introRef.current,
-        { opacity: 0, y: 16, filter: "blur(8px)" },
+        { opacity: 0, y: 16 },
         {
           opacity: 1,
           y: 0,
-          filter: "blur(0px)",
-          duration: 0.7,
+          duration: 0.55,
           ease: "power3.out",
         },
       );

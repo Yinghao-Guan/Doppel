@@ -64,7 +64,11 @@ const vertexShader = /* glsl */ `
     vec3 p = position;
     // Make the noise field "scroll" along the plane's local Y so the terrain
     // appears to drift toward the camera once the plane is rotated to lie flat.
-    float scrollY = p.y - uTime * uScrollSpeed;
+    // uTime is the noise-pattern *phase* (integral of speed), accumulated in JS.
+    // Multiplying by uScrollSpeed here would create a feedback term proportional
+    // to elapsed time, which causes the terrain to whip violently the moment
+    // uScrollSpeed changes (the longer the page has been open, the worse it is).
+    float scrollY = p.y - uTime;
     float n  = snoise(vec3(p.x * 0.13, scrollY * 0.13, 0.0));
     float n2 = snoise(vec3(p.x * 0.34 + 17.0, scrollY * 0.34, 9.3)) * 0.4;
     float n3 = snoise(vec3(p.x * 0.78 + 99.0, scrollY * 0.78, 3.7)) * 0.08;
@@ -157,13 +161,18 @@ export function TopoField({
     [],
   );
 
-  useFrame((state) => {
+  useFrame((_state, delta) => {
     if (throttleHalf) {
       skipRef.current = !skipRef.current;
       if (skipRef.current) return;
     }
     if (matRef.current) {
-      matRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+      // Accumulate phase as the time-integral of speed: dPhase = dt * speed.
+      // This decouples noise drift from total elapsed time, so when the gsap
+      // tween changes uScrollSpeed only the *future* drift rate changes, not
+      // the entire phase value (which is what produced the camera-tween spazz).
+      matRef.current.uniforms.uTime.value +=
+        delta * matRef.current.uniforms.uScrollSpeed.value;
     }
   });
 
@@ -177,19 +186,21 @@ export function TopoField({
   }, [accent]);
 
   // Smoothly tween scrollSpeed/intensity when route-driven props change so the
-  // terrain doesn't snap between landing and app modes.
+  // terrain doesn't snap between landing and app modes. Linear ease so the
+  // brightness change is at constant visible rate across the whole tween,
+  // not concentrated in a narrow middle window like power3.inOut produces.
   useEffect(() => {
     if (!matRef.current) return;
     gsap.to(matRef.current.uniforms.uScrollSpeed, {
       value: scrollSpeed,
-      duration: 0.9,
-      ease: "power2.inOut",
+      duration: 1.8,
+      ease: "none",
       overwrite: "auto",
     });
     gsap.to(matRef.current.uniforms.uIntensity, {
       value: intensity,
-      duration: 0.9,
-      ease: "power2.inOut",
+      duration: 1.8,
+      ease: "none",
       overwrite: "auto",
     });
   }, [scrollSpeed, intensity]);

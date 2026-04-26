@@ -13,10 +13,10 @@ const WalletButton = dynamic(
   { ssr: false }
 );
 
-const NAV_ITEMS: { label: string; href: string; matchPath: string }[] = [
-  { label: "CAPTURE", href: "/?step=capture", matchPath: "/" },
-  { label: "TWIN", href: "/twin", matchPath: "/twin" },
-  { label: "PROOF", href: "/proof", matchPath: "/proof" },
+const NAV_ITEMS: { label: string; href: string; matchStep: string }[] = [
+  { label: "CAPTURE", href: "/?step=capture", matchStep: "capture" },
+  { label: "TWIN", href: "/?step=twin", matchStep: "twin" },
+  { label: "PROOF", href: "/proof", matchStep: "proof" },
 ];
 
 type TopNavProps = { hideBrand?: boolean; hideNav?: boolean };
@@ -36,11 +36,9 @@ function TopNavInner({ hideBrand = false, hideNav = false }: TopNavProps) {
   const search = useSearchParams();
   const navigate = useTransitionNavigate();
 
-  const activeFor = (matchPath: string) => {
-    if (matchPath === "/") {
-      return pathname === "/" && search.get("step") === "capture";
-    }
-    return pathname?.startsWith(matchPath) ?? false;
+  const activeFor = (matchStep: string) => {
+    if (matchStep === "proof") return pathname === "/proof";
+    return pathname === "/" && search.get("step") === matchStep;
   };
 
   return (
@@ -59,7 +57,7 @@ function TopNavFrame({
   active,
   navigate,
 }: TopNavProps & {
-  active: ((matchPath: string) => boolean) | null;
+  active: ((matchStep: string) => boolean) | null;
   navigate: ((href: string) => void) | null;
 }) {
   return (
@@ -84,7 +82,7 @@ function TopNavFrame({
       <nav className="hidden items-center gap-8 md:flex">
         {!hideNav &&
           NAV_ITEMS.map((item) => {
-            const isActive = active ? active(item.matchPath) : false;
+            const isActive = active ? active(item.matchStep) : false;
             return (
               <a
                 key={item.href}

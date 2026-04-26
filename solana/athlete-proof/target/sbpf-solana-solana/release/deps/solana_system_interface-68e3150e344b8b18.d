@@ -1,9 +1,0 @@
-/Users/guanyinghao/Projects/BroncoHacks/solana/athlete-proof/target/sbpf-solana-solana/release/deps/solana_system_interface-68e3150e344b8b18.d: /Users/guanyinghao/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-system-interface-1.0.0/src/lib.rs /Users/guanyinghao/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-system-interface-1.0.0/src/error.rs /Users/guanyinghao/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-system-interface-1.0.0/src/instruction.rs
-
-/Users/guanyinghao/Projects/BroncoHacks/solana/athlete-proof/target/sbpf-solana-solana/release/deps/libsolana_system_interface-68e3150e344b8b18.rlib: /Users/guanyinghao/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-system-interface-1.0.0/src/lib.rs /Users/guanyinghao/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-system-interface-1.0.0/src/error.rs /Users/guanyinghao/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-system-interface-1.0.0/src/instruction.rs
-
-/Users/guanyinghao/Projects/BroncoHacks/solana/athlete-proof/target/sbpf-solana-solana/release/deps/libsolana_system_interface-68e3150e344b8b18.rmeta: /Users/guanyinghao/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-system-interface-1.0.0/src/lib.rs /Users/guanyinghao/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-system-interface-1.0.0/src/error.rs /Users/guanyinghao/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-system-interface-1.0.0/src/instruction.rs
-
-/Users/guanyinghao/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-system-interface-1.0.0/src/lib.rs:
-/Users/guanyinghao/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-system-interface-1.0.0/src/error.rs:
-/Users/guanyinghao/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-system-interface-1.0.0/src/instruction.rs:
