@@ -128,7 +128,7 @@ export async function synthesizeAndPlay(
  * logged but don't reject. Use this on Start Set so the first few live
  * cues during a set play instantly.
  */
-export function prefetch(texts: string[], voiceId?: string): void {
+export function prefetch(texts: readonly string[], voiceId?: string): void {
   for (const t of texts) {
     void synthesize(t, voiceId);
   }
