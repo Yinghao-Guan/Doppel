@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { PublicKey } from "@solana/web3.js";
-import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
+import { Connection, PublicKey, SendTransactionError } from "@solana/web3.js";
+import { Program, AnchorProvider } from "@coral-xyz/anchor";
 import { BACKEND_URL, PROGRAM_ID } from "@/lib/solana";
 import IDL from "@/lib/athlete_proof.json";
 
@@ -46,6 +46,7 @@ export function ProofPanel() {
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit() {
+    if (submitting) return;
     if (!publicKey || !wallet) {
       setVisible(true);
       return;
@@ -119,19 +120,31 @@ export function ProofPanel() {
       // 5. Submit proof on-chain
       setStatus("Waiting for wallet signature…");
       const proofHashBytes = hexToBytes(proof_hash);
-      const tx = await program.methods
-        .submitTrainingProof(
-          exercise,
-          reps,
-          formScore,
-          Math.round((formScore + (100 - fatigueScore)) / 2), // prediction_score
-          proofHashBytes
-        )
-        .accounts({ proof: proofPda, profile: profilePda, user: publicKey })
-        .rpc();
+      let txSignature: string;
+      try {
+        txSignature = await program.methods
+          .submitTrainingProof(
+            exercise,
+            reps,
+            formScore,
+            Math.round((formScore + (100 - fatigueScore)) / 2), // prediction_score
+            proofHashBytes
+          )
+          .accounts({ proof: proofPda, profile: profilePda, user: publicKey })
+          .rpc();
+      } catch (submitError) {
+        const recoveredSignature = await recoverDuplicateSubmission(
+          submitError,
+          connection,
+          accounts,
+          proofPda,
+        );
+        if (!recoveredSignature) throw submitError;
+        txSignature = recoveredSignature;
+      }
 
       setStatus(null);
-      setResult({ id, proof_hash, txSignature: tx, summary });
+      setResult({ id, proof_hash, txSignature, summary });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error.");
       setStatus(null);
@@ -260,4 +273,41 @@ export function ProofPanel() {
       </div>
     </div>
   );
+}
+
+async function recoverDuplicateSubmission(
+  error: unknown,
+  connection: Connection,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  accounts: any,
+  proofPda: PublicKey,
+): Promise<string | null> {
+  if (!(error instanceof SendTransactionError)) {
+    return null;
+  }
+
+  const message = error.message.toLowerCase();
+  if (!message.includes("already been processed")) {
+    return null;
+  }
+
+  try {
+    await accounts.trainingProof.fetch(proofPda);
+  } catch {
+    return null;
+  }
+
+  try {
+    const logs = await error.getLogs(connection);
+    console.info("Recovered duplicate Solana submission.", logs);
+  } catch {
+    // Best-effort log fetch only.
+  }
+
+  try {
+    const signatures = await connection.getSignaturesForAddress(proofPda, { limit: 1 });
+    return signatures[0]?.signature ?? null;
+  } catch {
+    return null;
+  }
 }

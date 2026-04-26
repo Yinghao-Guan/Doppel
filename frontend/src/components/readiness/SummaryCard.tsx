@@ -11,7 +11,6 @@ export function SummaryCard({ summary }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setShown("");
     setDone(false);
     if (!summary) return;
